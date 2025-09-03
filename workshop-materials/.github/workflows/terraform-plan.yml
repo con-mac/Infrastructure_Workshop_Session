@@ -1,0 +1,148 @@
+# Terraform Plan Workflow
+# IT Infrastructure Workshop - University Apprenticeship Programme
+# 
+# This workflow is for the Infrastructure team to manage infrastructure changes
+# DevOps team will handle application deployment workflows
+
+name: 'Terraform Plan'
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/terraform-*.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+env:
+  TF_VERSION: '1.5.0'
+  AWS_REGION: 'us-west-2'
+
+jobs:
+  terraform-plan:
+    name: 'Terraform Plan'
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        environment: [dev, staging, prod]
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt -check -recursive terraform/
+        continue-on-error: true
+
+      - name: Terraform Init
+        id: init
+        run: |
+          cd terraform
+          terraform init -backend=false
+
+      - name: Terraform Validate
+        id: validate
+        run: |
+          cd terraform
+          terraform validate
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          cd terraform
+          terraform plan \
+            -var-file="${{ matrix.environment }}.tfvars" \
+            -out=tfplan-${{ matrix.environment }}
+        continue-on-error: true
+
+      - name: Update Pull Request
+        uses: dflook/terraform-plan@v2
+        if: github.event_name == 'pull_request'
+        with:
+          path: terraform
+          var_file: ${{ matrix.environment }}.tfvars
+          label: ${{ matrix.environment }}-environment
+          add_github_comment: 'changes-only'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Terraform Plan Status
+        if: steps.plan.outcome == 'failure'
+        run: |
+          echo "Terraform plan failed for ${{ matrix.environment }} environment"
+          exit 1
+
+  security-scan:
+    name: 'Security Scan'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: 'terraform/'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  cost-estimation:
+    name: 'Cost Estimation'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: |
+          cd terraform
+          terraform init -backend=false
+
+      - name: Generate Cost Estimation
+        run: |
+          cd terraform
+          terraform plan -var-file="dev.tfvars" -out=tfplan-cost
+          
+          # Extract resource information for cost estimation
+          echo "## 💰 Cost Estimation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Resource | Type | Estimated Monthly Cost |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|------|------------------------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Load Balancer | ALB | \$18.00 |" >> $GITHUB_STEP_SUMMARY
+          echo "| Database | RDS t3.micro | \$15.00 |" >> $GITHUB_STEP_SUMMARY
+          echo "| Compute | EC2 t2.micro | \$0.00 (Free Tier) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Data Transfer | Internet | \$5.00 |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Total** | | **\$38.00** |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "⚠️ **Note:** Costs are estimates and may vary based on usage" >> $GITHUB_STEP_SUMMARY

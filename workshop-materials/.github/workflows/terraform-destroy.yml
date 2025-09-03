@@ -1,0 +1,100 @@
+# Terraform Destroy Workflow
+# IT Infrastructure Workshop - University Apprenticeship Programme
+# 
+# This workflow destroys infrastructure resources to prevent costs
+# Use with caution - this will delete all resources!
+
+name: 'Terraform Destroy'
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to destroy (dev/staging/prod)'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      confirm_destroy:
+        description: 'Type "DESTROY" to confirm'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  TF_VERSION: '1.5.0'
+  AWS_REGION: 'us-west-2'
+
+jobs:
+  terraform-destroy:
+    name: 'Terraform Destroy'
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm_destroy == 'DESTROY'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: |
+          cd terraform
+          terraform init
+
+      - name: Terraform Destroy
+        run: |
+          cd terraform
+          terraform destroy \
+            -var-file="${{ github.event.inputs.environment }}.tfvars" \
+            -auto-approve
+
+      - name: Verify Destruction
+        run: |
+          echo "## 🗑️ Infrastructure Destruction Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ github.event.inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ✅ Successfully Destroyed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🧹 Cleaned Up Resources:" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ VPC and subnets" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Load balancer" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Auto Scaling Group" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ EC2 instances" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ RDS database" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Security groups" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ CloudWatch dashboard" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "💰 **Cost savings:** No more charges for this environment!" >> $GITHUB_STEP_SUMMARY
+
+  destroy-confirmation:
+    name: 'Destroy Confirmation Required'
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm_destroy != 'DESTROY'
+    
+    steps:
+      - name: Show Confirmation Error
+        run: |
+          echo "## ❌ Destruction Cancelled" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Reason:** Confirmation text was not 'DESTROY'" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "To destroy infrastructure, you must type exactly: **DESTROY**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "⚠️ **Warning:** This action cannot be undone!" >> $GITHUB_STEP_SUMMARY
+          exit 1

@@ -1,0 +1,34 @@
+{
+  "status": "running",
+  "service": "apache",
+  "version": "2.4",
+  "uptime": "unknown",
+  "workshop": "IT Infrastructure Workshop",
+  "timestamp": "2024-10-03T12:00:00Z",
+  "environment": "workshop",
+  "health": {
+    "application": "healthy",
+    "database": "connected",
+    "load_balancer": "healthy",
+    "monitoring": "active"
+  },
+  "metrics": {
+    "response_time_ms": 45,
+    "requests_per_minute": 12,
+    "error_rate_percent": 0.0,
+    "cpu_usage_percent": 15.2,
+    "memory_usage_percent": 23.8
+  },
+  "endpoints": {
+    "health": "/health",
+    "status": "/status",
+    "main": "/",
+    "api": "/api"
+  },
+  "info": {
+    "student": "workshop-participant",
+    "date": "2024-10-03",
+    "session": "infrastructure-workshop",
+    "instructor": "infrastructure-team"
+  }
+}

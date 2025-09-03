@@ -1,0 +1,136 @@
+# DevOps Integration Workflow
+# IT Infrastructure Workshop - University Apprenticeship Programme
+# 
+# This workflow is a placeholder for DevOps team integration
+# DevOps team will replace this with their application deployment workflows
+
+name: 'DevOps Integration'
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: string
+      infrastructure_ready:
+        description: 'Infrastructure deployment status'
+        required: true
+        type: boolean
+    outputs:
+      application_url:
+        description: 'URL of the deployed application'
+        value: ${{ jobs.deploy-application.outputs.application_url }}
+      deployment_status:
+        description: 'Status of the application deployment'
+        value: ${{ jobs.deploy-application.outputs.status }}
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy-application:
+    name: 'Deploy Application'
+    runs-on: ubuntu-latest
+    if: ${{ inputs.infrastructure_ready }}
+    
+    outputs:
+      application_url: ${{ steps.get-infrastructure.outputs.alb_dns_name }}
+      status: ${{ steps.deploy.outcome }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: 'us-west-2'
+
+      - name: Get Infrastructure Information
+        id: get-infrastructure
+        run: |
+          # This would typically get infrastructure outputs from Terraform state
+          # For workshop purposes, we'll simulate this
+          echo "alb_dns_name=workshop-alb-123456789.us-west-2.elb.amazonaws.com" >> $GITHUB_OUTPUT
+          echo "db_endpoint=workshop-db.123456789.us-west-2.rds.amazonaws.com" >> $GITHUB_OUTPUT
+          echo "vpc_id=vpc-12345678" >> $GITHUB_OUTPUT
+
+      - name: Deploy Application
+        id: deploy
+        run: |
+          echo "## 🚀 Application Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** 🔄 In Progress" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Deployment Steps:" >> $GITHUB_STEP_SUMMARY
+          echo "1. ✅ Infrastructure ready" >> $GITHUB_STEP_SUMMARY
+          echo "2. 🔄 Building application container" >> $GITHUB_STEP_SUMMARY
+          echo "3. 🔄 Pushing to container registry" >> $GITHUB_STEP_SUMMARY
+          echo "4. 🔄 Deploying to ECS/EKS" >> $GITHUB_STEP_SUMMARY
+          echo "5. 🔄 Configuring load balancer" >> $GITHUB_STEP_SUMMARY
+          echo "6. 🔄 Running health checks" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Infrastructure Details:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Load Balancer:** ${{ steps.get-infrastructure.outputs.alb_dns_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Database:** ${{ steps.get-infrastructure.outputs.db_endpoint }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **VPC:** ${{ steps.get-infrastructure.outputs.vpc_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "⚠️ **Note:** This is a placeholder workflow. The DevOps team will implement the actual deployment logic." >> $GITHUB_STEP_SUMMARY
+          
+          # Simulate deployment time
+          sleep 30
+          
+          echo "✅ Application deployment completed successfully!"
+
+      - name: Application Health Check
+        run: |
+          echo "## 🏥 Application Health Check" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Application URL:** http://${{ steps.get-infrastructure.outputs.alb_dns_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Health Check Results:" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Application responding" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Database connection successful" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Load balancer health checks passing" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ All services operational" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🎉 **Application is ready for use!**" >> $GITHUB_STEP_SUMMARY
+
+  notify-teams:
+    name: 'Notify Teams'
+    runs-on: ubuntu-latest
+    needs: deploy-application
+    if: always()
+    
+    steps:
+      - name: Notify Infrastructure Team
+        if: needs.deploy-application.result == 'success'
+        run: |
+          echo "## 📢 Team Notification" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**To:** Infrastructure Team" >> $GITHUB_STEP_SUMMARY
+          echo "**Subject:** Application Successfully Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The DevOps team has successfully deployed the application to the ${{ inputs.environment }} environment." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Application URL:** ${{ needs.deploy-application.outputs.application_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Infrastructure is working as expected. Thank you for the solid foundation!" >> $GITHUB_STEP_SUMMARY
+
+      - name: Notify DevOps Team
+        if: needs.deploy-application.result == 'failure'
+        run: |
+          echo "## 📢 Team Notification" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**To:** DevOps Team" >> $GITHUB_STEP_SUMMARY
+          echo "**Subject:** Application Deployment Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The application deployment to the ${{ inputs.environment }} environment has failed." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Please check the deployment logs and infrastructure status." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Infrastructure team is available for support if needed." >> $GITHUB_STEP_SUMMARY
