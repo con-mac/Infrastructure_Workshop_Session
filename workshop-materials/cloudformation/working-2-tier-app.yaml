@@ -1,0 +1,586 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Working 2-Tier Web Application - Baseline Template for AWS Workshop'
+
+Parameters:
+  StudentEmail:
+    Type: String
+    Description: Student email address for resource tagging
+    Default: 'student@university.edu'
+  
+  Environment:
+    Type: String
+    Description: Environment name (dev, staging, prod)
+    Default: 'workshop'
+    AllowedValues: [workshop, dev, staging, prod]
+  
+  InstanceType:
+    Type: String
+    Description: EC2 instance type
+    Default: 't2.micro'
+    AllowedValues: [t2.micro, t2.small, t2.medium]
+  
+  DBInstanceClass:
+    Type: String
+    Description: RDS instance class
+    Default: 'db.t3.micro'
+    AllowedValues: [db.t3.micro, db.t3.small, db.t3.medium]
+  
+  DBPassword:
+    Type: String
+    Description: Database password
+    Default: 'Workshop2024!'
+    NoEcho: true
+    MinLength: 8
+
+Conditions:
+  IsWorkshop: !Equals [!Ref Environment, 'workshop']
+  IsProduction: !Equals [!Ref Environment, 'prod']
+
+Resources:
+  # VPC and Networking
+  WorkshopVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-vpc'
+        - Key: Workshop
+          Value: 'Infrastructure-2024'
+        - Key: Student
+          Value: !Ref StudentEmail
+        - Key: Environment
+          Value: !Ref Environment
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-igw'
+        - Key: Workshop
+          Value: 'Infrastructure-2024'
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref WorkshopVPC
+
+  # Public Subnet
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref WorkshopVPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-public-subnet'
+        - Key: Type
+          Value: 'Public'
+        - Key: Workshop
+          Value: 'Infrastructure-2024'
+
+  # Private Subnet
+  PrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref WorkshopVPC
+      CidrBlock: 10.0.2.0/24
+      AvailabilityZone: !Select [1, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-private-subnet'
+        - Key: Type
+          Value: 'Private'
+        - Key: Workshop
+          Value: 'Infrastructure-2024'
+
+  # NAT Gateway for private subnet access
+  NatGatewayEIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayEIP.AllocationId
+      SubnetId: !Ref PublicSubnet
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-nat-gateway'
+
+  # Route Tables
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref WorkshopVPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-public-rt'
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref WorkshopVPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-private-rt'
+
+  DefaultPrivateRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+
+  PrivateSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnet
+
+  # Network ACLs (Default - Allowing all traffic)
+  PublicNetworkAcl:
+    Type: AWS::EC2::NetworkAcl
+    Properties:
+      VpcId: !Ref WorkshopVPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-public-nacl'
+
+  # Default Network ACL rules (allow all traffic)
+  PublicNetworkAclInboundRule:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      NetworkAclId: !Ref PublicNetworkAcl
+      RuleNumber: 100
+      Protocol: -1
+      RuleAction: allow
+      CidrBlock: 0.0.0.0/0
+
+  PublicNetworkAclOutboundRule:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      NetworkAclId: !Ref PublicNetworkAcl
+      RuleNumber: 100
+      Protocol: -1
+      RuleAction: allow
+      CidrBlock: 0.0.0.0/0
+      Egress: true
+
+  PublicSubnetNetworkAclAssociation:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref PublicNetworkAcl
+      SubnetId: !Ref PublicSubnet
+
+  # Security Groups
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for web tier
+      VpcId: !Ref WorkshopVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: HTTP access from internet
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: HTTPS access from internet
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: All outbound traffic
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-web-sg'
+        - Key: Workshop
+          Value: 'Infrastructure-2024'
+
+  AppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for application tier
+      VpcId: !Ref WorkshopVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref WebSecurityGroup
+          Description: HTTP access from web tier
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: All outbound traffic
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-app-sg'
+        - Key: Workshop
+          Value: 'Infrastructure-2024'
+
+  DatabaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for database tier
+      VpcId: !Ref WorkshopVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref AppSecurityGroup
+          Description: MySQL access from app tier
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: All outbound traffic
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-db-sg'
+        - Key: Workshop
+          Value: 'Infrastructure-2024'
+
+  # IAM Role for EC2 instances
+  EC2InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-ec2-role'
+        - Key: Workshop
+          Value: 'Infrastructure-2024'
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref EC2InstanceRole
+
+  # Launch Template
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub '${StudentEmail}-${Environment}-lt'
+      LaunchTemplateData:
+        ImageId: ami-0c02fb55956c7d316  # Amazon Linux 2 AMI
+        InstanceType: !Ref InstanceType
+        IamInstanceProfile:
+          Arn: !GetAtt EC2InstanceProfile.Arn
+        SecurityGroupIds:
+          - !Ref WebSecurityGroup
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            yum update -y
+            yum install -y httpd php php-mysqlnd
+            
+            # Start Apache
+            systemctl start httpd
+            systemctl enable httpd
+            
+            # Create simple web application
+            cat > /var/www/html/index.php << 'EOF'
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>AWS Workshop - Working Application</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+                    .container { max-width: 800px; margin: 0 auto; background: rgba(255,255,255,0.1); padding: 30px; border-radius: 15px; }
+                    .status { background: #28a745; padding: 10px; border-radius: 5px; margin: 20px 0; }
+                    .info { background: rgba(255,255,255,0.2); padding: 15px; border-radius: 10px; margin: 10px 0; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>🚀 AWS Workshop - Working Application</h1>
+                    <div class="status">✅ Application Status: HEALTHY</div>
+                    <div class="info">
+                        <h3>System Information</h3>
+                        <p><strong>Server:</strong> <?php echo gethostname(); ?></p>
+                        <p><strong>PHP Version:</strong> <?php echo phpversion(); ?></p>
+                        <p><strong>Timestamp:</strong> <?php echo date('Y-m-d H:i:s T'); ?></p>
+                        <p><strong>Student:</strong> ${StudentEmail}</p>
+                        <p><strong>Environment:</strong> ${Environment}</p>
+                    </div>
+                    <div class="info">
+                        <h3>Architecture</h3>
+                        <p>✅ VPC and Subnets</p>
+                        <p>✅ Security Groups</p>
+                        <p>✅ Load Balancer</p>
+                        <p>✅ Auto Scaling Group</p>
+                        <p>✅ Database</p>
+                        <p>✅ Monitoring</p>
+                    </div>
+                    <p><em>This is the baseline working application. All components are properly configured!</em></p>
+                </div>
+            </body>
+            </html>
+            EOF
+            
+            # Create health check endpoint
+            cat > /var/www/html/health << 'EOF'
+            OK
+            EOF
+            
+            # Create detailed health check
+            cat > /var/www/html/health.php << 'EOF'
+            <?php
+            header('Content-Type: application/json');
+            echo json_encode([
+                'status' => 'healthy',
+                'timestamp' => date('c'),
+                'server' => gethostname(),
+                'php_version' => phpversion(),
+                'checks' => [
+                    'apache' => 'running',
+                    'php' => 'working',
+                    'disk_space' => disk_free_space('/') > 1000000000 ? 'ok' : 'low'
+                ]
+            ], JSON_PRETTY_PRINT);
+            ?>
+            EOF
+            
+            # Set permissions
+            chown -R apache:apache /var/www/html
+            chmod -R 755 /var/www/html
+            
+            # Restart Apache
+            systemctl restart httpd
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: Name
+                Value: !Sub '${StudentEmail}-${Environment}-web-server'
+              - Key: Workshop
+                Value: 'Infrastructure-2024'
+
+  # Application Load Balancer
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub '${StudentEmail}-${Environment}-alb'
+      Scheme: internet-facing
+      Type: application
+      SecurityGroups:
+        - !Ref WebSecurityGroup
+      Subnets:
+        - !Ref PublicSubnet
+        - !Ref PrivateSubnet
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-alb'
+        - Key: Workshop
+          Value: 'Infrastructure-2024'
+
+  # Target Group
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub '${StudentEmail}-${Environment}-tg'
+      Port: 80
+      Protocol: HTTP
+      VpcId: !Ref WorkshopVPC
+      HealthCheckPath: /health
+      HealthCheckProtocol: HTTP
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+      TargetType: instance
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-tg'
+        - Key: Workshop
+          Value: 'Infrastructure-2024'
+
+  # Load Balancer Listener
+  LoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  # Auto Scaling Group
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: !Sub '${StudentEmail}-${Environment}-asg'
+      VPCZoneIdentifier:
+        - !Ref PublicSubnet
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      MinSize: 1
+      MaxSize: 3
+      DesiredCapacity: 2
+      TargetGroupARNs:
+        - !Ref TargetGroup
+      HealthCheckType: ELB
+      HealthCheckGracePeriod: 300
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-asg'
+          PropagateAtLaunch: true
+        - Key: Workshop
+          Value: 'Infrastructure-2024'
+          PropagateAtLaunch: true
+
+  # Database Subnet Group
+  DatabaseSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupName: !Sub '${StudentEmail}-${Environment}-db-subnet-group'
+      DBSubnetGroupDescription: Subnet group for workshop database
+      SubnetIds:
+        - !Ref PrivateSubnet
+        - !Ref PublicSubnet
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-db-subnet-group'
+        - Key: Workshop
+          Value: 'Infrastructure-2024'
+
+  # RDS Database
+  Database:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: !Sub '${StudentEmail}-${Environment}-db'
+      DBInstanceClass: !Ref DBInstanceClass
+      Engine: mysql
+      EngineVersion: '8.0'
+      AllocatedStorage: 20
+      StorageType: gp2
+      StorageEncrypted: true
+      DBName: workshopdb
+      MasterUsername: admin
+      MasterUserPassword: !Ref DBPassword
+      VPCSecurityGroups:
+        - !Ref DatabaseSecurityGroup
+      DBSubnetGroupName: !Ref DatabaseSubnetGroup
+      BackupRetentionPeriod: 7
+      PreferredBackupWindow: '03:00-04:00'
+      PreferredMaintenanceWindow: 'sun:04:00-sun:05:00'
+      SkipFinalSnapshot: true
+      DeletionProtection: false
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-db'
+        - Key: Workshop
+          Value: 'Infrastructure-2024'
+
+  # CloudWatch Dashboard
+  CloudWatchDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub '${StudentEmail}-${Environment}-dashboard'
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  ["AWS/ApplicationELB", "TargetResponseTime", "LoadBalancer", "${ApplicationLoadBalancer}"],
+                  ["AWS/ApplicationELB", "RequestCount", "LoadBalancer", "${ApplicationLoadBalancer}"]
+                ],
+                "period": 300,
+                "stat": "Average",
+                "region": "${AWS::Region}",
+                "title": "Load Balancer Metrics"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 6,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  ["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", "${Database}"],
+                  ["AWS/RDS", "DatabaseConnections", "DBInstanceIdentifier", "${Database}"]
+                ],
+                "period": 300,
+                "stat": "Average",
+                "region": "${AWS::Region}",
+                "title": "Database Metrics"
+              }
+            }
+          ]
+        }
+
+Outputs:
+  ApplicationURL:
+    Description: URL to access the application
+    Value: !Sub 'http://${ApplicationLoadBalancer.DNSName}'
+    Export:
+      Name: !Sub '${AWS::StackName}-ApplicationURL'
+
+  LoadBalancerDNS:
+    Description: DNS name of the load balancer
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+    Export:
+      Name: !Sub '${AWS::StackName}-LoadBalancerDNS'
+
+  DatabaseEndpoint:
+    Description: RDS instance endpoint
+    Value: !GetAtt Database.Endpoint.Address
+    Export:
+      Name: !Sub '${AWS::StackName}-DatabaseEndpoint'
+
+  VPCId:
+    Description: VPC ID
+    Value: !Ref WorkshopVPC
+    Export:
+      Name: !Sub '${AWS::StackName}-VPCId'
+
+  DashboardURL:
+    Description: CloudWatch Dashboard URL
+    Value: !Sub 'https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=${CloudWatchDashboard}'
+
+  StudentInfo:
+    Description: Student and environment information
+    Value: !Sub 'Student: ${StudentEmail}, Environment: ${Environment}'

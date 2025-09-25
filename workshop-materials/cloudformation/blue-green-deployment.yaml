@@ -1,0 +1,484 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Blue-Green Deployment Demo - Demonstrates zero-downtime deployment strategy with traffic switching'
+
+Parameters:
+  StudentEmail:
+    Type: String
+    Description: Student email address for resource tagging
+    Default: 'student@university.edu'
+  
+  Environment:
+    Type: String
+    Description: Environment name
+    Default: 'workshop'
+  
+  DeploymentVersion:
+    Type: String
+    Description: Application version (blue or green)
+    Default: 'blue'
+    AllowedValues: [blue, green]
+
+Resources:
+  # VPC and Networking
+  WorkshopVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-vpc'
+        - Key: Demo
+          Value: 'Blue-Green-Deployment'
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-igw'
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref WorkshopVPC
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref WorkshopVPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-public-subnet'
+
+  # Route Table
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref WorkshopVPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-public-rt'
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet
+
+  # Security Groups
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for web tier
+      VpcId: !Ref WorkshopVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: HTTP access from internet
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: All outbound traffic
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-web-sg'
+
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for load balancer
+      VpcId: !Ref WorkshopVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: HTTP access from internet
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: All outbound traffic
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-alb-sg'
+
+  # Launch Template for Blue Version
+  BlueLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Condition: IsBlueVersion
+    Properties:
+      LaunchTemplateName: !Sub '${StudentEmail}-${Environment}-blue-lt'
+      LaunchTemplateData:
+        ImageId: ami-0c02fb55956c7d316  # Amazon Linux 2 AMI
+        InstanceType: t2.micro
+        SecurityGroupIds:
+          - !Ref WebSecurityGroup
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            yum update -y
+            yum install -y httpd
+            
+            # Start Apache
+            systemctl start httpd
+            systemctl enable httpd
+            
+            # Create Blue version application
+            cat > /var/www/html/index.html << 'EOF'
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Blue-Green Deployment - Blue Version</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 40px; background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; }
+                    .container { max-width: 800px; margin: 0 auto; background: rgba(255,255,255,0.1); padding: 30px; border-radius: 15px; }
+                    .version { background: #1e3c72; padding: 15px; border-radius: 10px; margin: 20px 0; border: 3px solid #4a90e2; }
+                    .info { background: rgba(255,255,255,0.2); padding: 15px; border-radius: 10px; margin: 10px 0; }
+                    .feature { background: rgba(74, 144, 226, 0.3); padding: 10px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #4a90e2; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>🚀 Blue-Green Deployment Demo</h1>
+                    
+                    <div class="version">
+                        <h2>🔵 BLUE VERSION - v1.0</h2>
+                        <p><strong>Status:</strong> Active Production</p>
+                        <p><strong>Deployed:</strong> $(date)</p>
+                        <p><strong>Server:</strong> $(hostname)</p>
+                    </div>
+                    
+                    <div class="info">
+                        <h3>📋 Current Features (Blue Version)</h3>
+                        <div class="feature">✅ User Authentication</div>
+                        <div class="feature">✅ Basic Dashboard</div>
+                        <div class="feature">✅ User Profile Management</div>
+                        <div class="feature">✅ Email Notifications</div>
+                        <div class="feature">⏳ Advanced Analytics (Coming in Green)</div>
+                        <div class="feature">⏳ Real-time Chat (Coming in Green)</div>
+                    </div>
+                    
+                    <div class="info">
+                        <h3>🎯 Blue-Green Deployment Process</h3>
+                        <ol>
+                            <li><strong>Blue Environment:</strong> Current production (this version)</li>
+                            <li><strong>Green Environment:</strong> New version being tested</li>
+                            <li><strong>Traffic Switch:</strong> Load balancer redirects traffic</li>
+                            <li><strong>Rollback:</strong> Switch back to Blue if issues occur</li>
+                        </ol>
+                    </div>
+                    
+                    <div class="info">
+                        <h3>🔄 Deployment Status</h3>
+                        <p><strong>Current Traffic:</strong> 100% to Blue</p>
+                        <p><strong>Green Status:</strong> Ready for deployment</p>
+                        <p><strong>Health Check:</strong> Passing</p>
+                    </div>
+                    
+                    <p><em>This is the stable Blue version running in production. The Green version contains new features and is ready for deployment!</em></p>
+                </div>
+            </body>
+            </html>
+            EOF
+            
+            # Create health check endpoint
+            echo "OK - Blue Version" > /var/www/html/health
+            
+            # Set permissions
+            chown -R apache:apache /var/www/html
+            chmod -R 755 /var/www/html
+            
+            # Restart Apache
+            systemctl restart httpd
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: Name
+                Value: !Sub '${StudentEmail}-${Environment}-blue-server'
+              - Key: Version
+                Value: 'blue'
+              - Key: Demo
+                Value: 'Blue-Green-Deployment'
+
+  # Launch Template for Green Version
+  GreenLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Condition: IsGreenVersion
+    Properties:
+      LaunchTemplateName: !Sub '${StudentEmail}-${Environment}-green-lt'
+      LaunchTemplateData:
+        ImageId: ami-0c02fb55956c7d316  # Amazon Linux 2 AMI
+        InstanceType: t2.micro
+        SecurityGroupIds:
+          - !Ref WebSecurityGroup
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            yum update -y
+            yum install -y httpd
+            
+            # Start Apache
+            systemctl start httpd
+            systemctl enable httpd
+            
+            # Create Green version application with new features
+            cat > /var/www/html/index.html << 'EOF'
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Blue-Green Deployment - Green Version</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 40px; background: linear-gradient(135deg, #0f4c3a 0%, #2d8659 100%); color: white; }
+                    .container { max-width: 800px; margin: 0 auto; background: rgba(255,255,255,0.1); padding: 30px; border-radius: 15px; }
+                    .version { background: #0f4c3a; padding: 15px; border-radius: 10px; margin: 20px 0; border: 3px solid #52c41a; }
+                    .info { background: rgba(255,255,255,0.2); padding: 15px; border-radius: 10px; margin: 10px 0; }
+                    .feature { background: rgba(82, 196, 26, 0.3); padding: 10px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #52c41a; }
+                    .new { background: rgba(255, 193, 7, 0.3); padding: 10px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #ffc107; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>🚀 Blue-Green Deployment Demo</h1>
+                    
+                    <div class="version">
+                        <h2>🟢 GREEN VERSION - v2.0</h2>
+                        <p><strong>Status:</strong> New Release Candidate</p>
+                        <p><strong>Deployed:</strong> $(date)</p>
+                        <p><strong>Server:</strong> $(hostname)</p>
+                    </div>
+                    
+                    <div class="info">
+                        <h3>📋 Enhanced Features (Green Version)</h3>
+                        <div class="feature">✅ User Authentication</div>
+                        <div class="feature">✅ Enhanced Dashboard</div>
+                        <div class="feature">✅ Advanced Profile Management</div>
+                        <div class="feature">✅ Smart Email Notifications</div>
+                        <div class="new">🆕 Advanced Analytics Dashboard</div>
+                        <div class="new">🆕 Real-time Chat System</div>
+                        <div class="new">🆕 Dark Mode Support</div>
+                        <div class="new">🆕 Mobile App Integration</div>
+                    </div>
+                    
+                    <div class="info">
+                        <h3>🎯 Blue-Green Deployment Process</h3>
+                        <ol>
+                            <li><strong>Blue Environment:</strong> Previous production version</li>
+                            <li><strong>Green Environment:</strong> New version (this version)</li>
+                            <li><strong>Traffic Switch:</strong> Load balancer redirects traffic</li>
+                            <li><strong>Rollback:</strong> Switch back to Blue if issues occur</li>
+                        </ol>
+                    </div>
+                    
+                    <div class="info">
+                        <h3>🔄 Deployment Status</h3>
+                        <p><strong>Current Traffic:</strong> 0% to Green (testing phase)</p>
+                        <p><strong>Blue Status:</strong> Active production</p>
+                        <p><strong>Health Check:</strong> Passing</p>
+                    </div>
+                    
+                    <div class="new">
+                        <h3>🆕 What's New in v2.0</h3>
+                        <ul>
+                            <li>Advanced analytics with real-time charts</li>
+                            <li>Integrated chat system for team collaboration</li>
+                            <li>Dark mode for better user experience</li>
+                            <li>Mobile app synchronization</li>
+                            <li>Improved performance and security</li>
+                        </ul>
+                    </div>
+                    
+                    <p><em>This is the new Green version with enhanced features. Ready for production deployment!</em></p>
+                </div>
+            </body>
+            </html>
+            EOF
+            
+            # Create health check endpoint
+            echo "OK - Green Version" > /var/www/html/health
+            
+            # Set permissions
+            chown -R apache:apache /var/www/html
+            chmod -R 755 /var/www/html
+            
+            # Restart Apache
+            systemctl restart httpd
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: Name
+                Value: !Sub '${StudentEmail}-${Environment}-green-server'
+              - Key: Version
+                Value: 'green'
+              - Key: Demo
+                Value: 'Blue-Green-Deployment'
+
+  # Application Load Balancer
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub '${StudentEmail}-${Environment}-alb'
+      Scheme: internet-facing
+      Type: application
+      SecurityGroups:
+        - !Ref LoadBalancerSecurityGroup
+      Subnets:
+        - !Ref PublicSubnet
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-alb'
+        - Key: Demo
+          Value: 'Blue-Green-Deployment'
+
+  # Blue Target Group
+  BlueTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub '${StudentEmail}-${Environment}-blue-tg'
+      Port: 80
+      Protocol: HTTP
+      VpcId: !Ref WorkshopVPC
+      HealthCheckPath: /health
+      HealthCheckProtocol: HTTP
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+      TargetType: instance
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-blue-tg'
+        - Key: Version
+          Value: 'blue'
+
+  # Green Target Group
+  GreenTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub '${StudentEmail}-${Environment}-green-tg'
+      Port: 80
+      Protocol: HTTP
+      VpcId: !Ref WorkshopVPC
+      HealthCheckPath: /health
+      HealthCheckProtocol: HTTP
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+      TargetType: instance
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-green-tg'
+        - Key: Version
+          Value: 'green'
+
+  # Load Balancer Listener with traffic switching capability
+  LoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref BlueTargetGroup  # Default to Blue
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  # Blue Auto Scaling Group
+  BlueAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Condition: IsBlueVersion
+    Properties:
+      AutoScalingGroupName: !Sub '${StudentEmail}-${Environment}-blue-asg'
+      VPCZoneIdentifier:
+        - !Ref PublicSubnet
+      LaunchTemplate:
+        LaunchTemplateId: !Ref BlueLaunchTemplate
+        Version: !GetAtt BlueLaunchTemplate.LatestVersionNumber
+      MinSize: 1
+      MaxSize: 3
+      DesiredCapacity: 2
+      TargetGroupARNs:
+        - !Ref BlueTargetGroup
+      HealthCheckType: ELB
+      HealthCheckGracePeriod: 300
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-blue-asg'
+          PropagateAtLaunch: true
+        - Key: Version
+          Value: 'blue'
+          PropagateAtLaunch: true
+
+  # Green Auto Scaling Group
+  GreenAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Condition: IsGreenVersion
+    Properties:
+      AutoScalingGroupName: !Sub '${StudentEmail}-${Environment}-green-asg'
+      VPCZoneIdentifier:
+        - !Ref PublicSubnet
+      LaunchTemplate:
+        LaunchTemplateId: !Ref GreenLaunchTemplate
+        Version: !GetAtt GreenLaunchTemplate.LatestVersionNumber
+      MinSize: 1
+      MaxSize: 3
+      DesiredCapacity: 2
+      TargetGroupARNs:
+        - !Ref GreenTargetGroup
+      HealthCheckType: ELB
+      HealthCheckGracePeriod: 300
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-green-asg'
+          PropagateAtLaunch: true
+        - Key: Version
+          Value: 'green'
+          PropagateAtLaunch: true
+
+Conditions:
+  IsBlueVersion: !Equals [!Ref DeploymentVersion, 'blue']
+  IsGreenVersion: !Equals [!Ref DeploymentVersion, 'green']
+
+Outputs:
+  LoadBalancerDNS:
+    Description: DNS name of the load balancer
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+
+  ApplicationURL:
+    Description: URL to access the application
+    Value: !Sub 'http://${ApplicationLoadBalancer.DNSName}'
+
+  BlueTargetGroupARN:
+    Description: Blue Target Group ARN
+    Value: !Ref BlueTargetGroup
+
+  GreenTargetGroupARN:
+    Description: Green Target Group ARN
+    Value: !Ref GreenTargetGroup
+
+  LoadBalancerListenerARN:
+    Description: Load Balancer Listener ARN for traffic switching
+    Value: !Ref LoadBalancerListener
+
+  CurrentVersion:
+    Description: Currently deployed version
+    Value: !Ref DeploymentVersion
+
+  DemoInstructions:
+    Description: Blue-Green deployment demonstration instructions
+    Value: !Sub 'Deploy both blue and green versions, then use the load balancer listener to switch traffic between versions for zero-downtime deployment.'

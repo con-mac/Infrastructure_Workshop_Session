@@ -1,0 +1,275 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'NACL Challenge - Network ACL blocks inbound HTTP traffic. Students must identify and fix the issue.'
+
+Parameters:
+  StudentEmail:
+    Type: String
+    Description: Student email address for resource tagging
+    Default: 'student@university.edu'
+  
+  Environment:
+    Type: String
+    Description: Environment name
+    Default: 'workshop'
+    AllowedValues: [workshop, dev, staging, prod]
+
+Resources:
+  # VPC and Networking (Same as working template)
+  WorkshopVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-vpc'
+        - Key: Workshop
+          Value: 'Infrastructure-2024'
+        - Key: Challenge
+          Value: 'NACL-Misconfiguration'
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-igw'
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref WorkshopVPC
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref WorkshopVPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-public-subnet'
+
+  # Route Table for public subnet
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref WorkshopVPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-public-rt'
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet
+
+  # Security Group (Correctly configured)
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for web tier
+      VpcId: !Ref WorkshopVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: HTTP access from internet
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: All outbound traffic
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-web-sg'
+
+  # Network ACL with MISCONFIGURATION - Blocks inbound HTTP traffic
+  PublicNetworkAcl:
+    Type: AWS::EC2::NetworkAcl
+    Properties:
+      VpcId: !Ref WorkshopVPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-public-nacl'
+        - Key: Challenge
+          Value: 'This NACL blocks inbound HTTP traffic - students must fix!'
+
+  # MISCONFIGURED: Block inbound HTTP traffic (port 80)
+  PublicNetworkAclBlockHTTP:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      NetworkAclId: !Ref PublicNetworkAcl
+      RuleNumber: 100
+      Protocol: 6  # TCP
+      RuleAction: deny
+      CidrBlock: 0.0.0.0/0
+      PortRange:
+        From: 80
+        To: 80
+
+  # MISCONFIGURED: Block inbound HTTPS traffic (port 443)
+  PublicNetworkAclBlockHTTPS:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      NetworkAclId: !Ref PublicNetworkAcl
+      RuleNumber: 110
+      Protocol: 6  # TCP
+      RuleAction: deny
+      CidrBlock: 0.0.0.0/0
+      PortRange:
+        From: 443
+        To: 443
+
+  # Allow all outbound traffic
+  PublicNetworkAclAllowOutbound:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      NetworkAclId: !Ref PublicNetworkAcl
+      RuleNumber: 100
+      Protocol: -1
+      RuleAction: allow
+      CidrBlock: 0.0.0.0/0
+      Egress: true
+
+  # Default allow rule for inbound (but comes after deny rules)
+  PublicNetworkAclDefaultAllow:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      NetworkAclId: !Ref PublicNetworkAcl
+      RuleNumber: 32767
+      Protocol: -1
+      RuleAction: allow
+      CidrBlock: 0.0.0.0/0
+
+  # Associate the problematic NACL with the public subnet
+  PublicSubnetNetworkAclAssociation:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref PublicNetworkAcl
+      SubnetId: !Ref PublicSubnet
+
+  # Simple EC2 instance to test connectivity
+  WebServer:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0c02fb55956c7d316  # Amazon Linux 2 AMI
+      InstanceType: t2.micro
+      SecurityGroupIds:
+        - !Ref WebSecurityGroup
+      SubnetId: !Ref PublicSubnet
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install -y httpd
+          
+          # Start Apache
+          systemctl start httpd
+          systemctl enable httpd
+          
+          # Create simple web page
+          cat > /var/www/html/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>NACL Challenge - Troubleshooting Required</title>
+              <style>
+                  body { font-family: Arial, sans-serif; margin: 40px; background: #f8f9fa; }
+                  .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                  .error { background: #dc3545; color: white; padding: 15px; border-radius: 5px; margin: 20px 0; }
+                  .challenge { background: #ffc107; color: #212529; padding: 15px; border-radius: 5px; margin: 20px 0; }
+                  .info { background: #d1ecf1; color: #0c5460; padding: 15px; border-radius: 5px; margin: 20px 0; }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <h1>🔧 NACL Challenge - Troubleshooting Required</h1>
+                  
+                  <div class="error">
+                      <h3>❌ Problem Identified</h3>
+                      <p>This application should be accessible from the internet, but it's not working properly.</p>
+                      <p><strong>Symptoms:</strong> Cannot access the application via HTTP</p>
+                  </div>
+                  
+                  <div class="challenge">
+                      <h3>🎯 Your Challenge</h3>
+                      <p><strong>Objective:</strong> Identify and fix the network connectivity issue</p>
+                      <p><strong>Hint:</strong> Check the Network ACL (NACL) configuration</p>
+                      <p><strong>Expected Result:</strong> Application should be accessible from the internet</p>
+                  </div>
+                  
+                  <div class="info">
+                      <h3>📋 Troubleshooting Steps</h3>
+                      <ol>
+                          <li>Check if the EC2 instance is running</li>
+                          <li>Verify Security Group rules</li>
+                          <li>Examine Network ACL rules</li>
+                          <li>Test connectivity from different sources</li>
+                          <li>Fix the identified issue</li>
+                      </ol>
+                  </div>
+                  
+                  <div class="info">
+                      <h3>🔍 Investigation Tools</h3>
+                      <ul>
+                          <li>AWS Console → EC2 → Instances</li>
+                          <li>AWS Console → VPC → Network ACLs</li>
+                          <li>AWS Console → VPC → Security Groups</li>
+                          <li>Test with: curl, browser, or ping</li>
+                      </ul>
+                  </div>
+                  
+                  <p><em>This is a simulated real-world scenario. Network ACLs can block traffic even when Security Groups allow it!</em></p>
+              </div>
+          </body>
+          </html>
+          EOF
+          
+          # Create health check endpoint
+          echo "OK" > /var/www/html/health
+          
+          # Set permissions
+          chown -R apache:apache /var/www/html
+          chmod -R 755 /var/www/html
+          
+          # Restart Apache
+          systemctl restart httpd
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-webserver'
+        - Key: Challenge
+          Value: 'NACL-Misconfiguration'
+
+Outputs:
+  PublicIP:
+    Description: Public IP of the web server (should not be accessible due to NACL)
+    Value: !GetAtt WebServer.PublicIp
+
+  InstanceID:
+    Description: EC2 Instance ID for troubleshooting
+    Value: !Ref WebServer
+
+  VPCId:
+    Description: VPC ID for troubleshooting
+    Value: !Ref WorkshopVPC
+
+  NetworkAclId:
+    Description: Network ACL ID that needs to be fixed
+    Value: !Ref PublicNetworkAcl
+
+  ChallengeInstructions:
+    Description: Challenge instructions for students
+    Value: 'NACL Challenge: The Network ACL is blocking inbound HTTP traffic. Students must identify and fix the NACL rules to allow web traffic.'

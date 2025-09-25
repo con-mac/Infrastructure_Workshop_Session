@@ -1,0 +1,377 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'IAM Challenge - EC2 instance lacks permissions to access required AWS services. Students must fix IAM policies.'
+
+Parameters:
+  StudentEmail:
+    Type: String
+    Description: Student email address for resource tagging
+    Default: 'student@university.edu'
+  
+  Environment:
+    Type: String
+    Description: Environment name
+    Default: 'workshop'
+
+Resources:
+  # VPC and Networking
+  WorkshopVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-vpc'
+        - Key: Challenge
+          Value: 'IAM-Permission-Issues'
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-igw'
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref WorkshopVPC
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref WorkshopVPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-public-subnet'
+
+  # Route Table
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref WorkshopVPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-public-rt'
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet
+
+  # Security Group (Correctly configured)
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for web tier
+      VpcId: !Ref WorkshopVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: HTTP access from internet
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: All outbound traffic
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-web-sg'
+
+  # MISCONFIGURED IAM Role - Lacks required permissions
+  EC2InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      # MISSING: No managed policies attached
+      # MISSING: No custom policies for S3 access
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-ec2-role'
+        - Key: Challenge
+          Value: 'IAM role lacks required permissions'
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref EC2InstanceRole
+
+  # S3 Bucket for application data
+  ApplicationDataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${StudentEmail}-${Environment}-app-data-${AWS::AccountId}'
+      PublicReadPolicy: false
+      VersioningConfiguration:
+        Status: Enabled
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-app-data'
+        - Key: Challenge
+          Value: 'IAM-Permission-Issues'
+
+  # S3 Bucket Policy
+  ApplicationDataBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ApplicationDataBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !GetAtt EC2InstanceRole.Arn
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+              - s3:DeleteObject
+            Resource: !Sub '${ApplicationDataBucket}/*'
+          - Effect: Allow
+            Principal:
+              AWS: !GetAtt EC2InstanceRole.Arn
+            Action: s3:ListBucket
+            Resource: !Ref ApplicationDataBucket
+
+  # CloudWatch Log Group
+  ApplicationLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/ec2/${StudentEmail}-${Environment}'
+      RetentionInDays: 7
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-logs'
+        - Key: Challenge
+          Value: 'IAM-Permission-Issues'
+
+  # EC2 Instance with application that needs AWS service access
+  WebServer:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0c02fb55956c7d316  # Amazon Linux 2 AMI
+      InstanceType: t2.micro
+      SecurityGroupIds:
+        - !Ref WebSecurityGroup
+      SubnetId: !Ref PublicSubnet
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install -y httpd php php-json awscli
+          
+          # Start Apache
+          systemctl start httpd
+          systemctl enable httpd
+          
+          # Create web application that demonstrates IAM issues
+          cat > /var/www/html/index.php << 'EOF'
+          <?php
+          // Test AWS service access
+          $s3_status = 'Unknown';
+          $cloudwatch_status = 'Unknown';
+          $errors = [];
+          
+          // Test S3 access
+          try {
+              $s3_output = shell_exec('aws s3 ls s3://${ApplicationDataBucket} 2>&1');
+              if (strpos($s3_output, 'error') !== false || strpos($s3_output, 'denied') !== false) {
+                  $s3_status = 'Failed - Access Denied';
+                  $errors[] = 'S3 access denied';
+              } else {
+                  $s3_status = 'Success';
+              }
+          } catch (Exception $e) {
+              $s3_status = 'Failed - ' . $e->getMessage();
+              $errors[] = 'S3 access failed';
+          }
+          
+          // Test CloudWatch Logs access
+          try {
+              $logs_output = shell_exec('aws logs describe-log-groups --log-group-name-prefix /aws/ec2/ 2>&1');
+              if (strpos($logs_output, 'error') !== false || strpos($logs_output, 'denied') !== false) {
+                  $cloudwatch_status = 'Failed - Access Denied';
+                  $errors[] = 'CloudWatch Logs access denied';
+              } else {
+                  $cloudwatch_status = 'Success';
+              }
+          } catch (Exception $e) {
+              $cloudwatch_status = 'Failed - ' . $e->getMessage();
+              $errors[] = 'CloudWatch Logs access failed';
+          }
+          
+          $has_errors = count($errors) > 0;
+          ?>
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>IAM Challenge - Permission Issues</title>
+              <style>
+                  body { font-family: Arial, sans-serif; margin: 40px; background: #f8f9fa; }
+                  .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                  .error { background: #dc3545; color: white; padding: 15px; border-radius: 5px; margin: 20px 0; }
+                  .success { background: #28a745; color: white; padding: 15px; border-radius: 5px; margin: 20px 0; }
+                  .challenge { background: #ffc107; color: #212529; padding: 15px; border-radius: 5px; margin: 20px 0; }
+                  .info { background: #d1ecf1; color: #0c5460; padding: 15px; border-radius: 5px; margin: 20px 0; }
+                  .status { margin: 10px 0; padding: 10px; border-radius: 5px; }
+                  .status.failed { background: #f8d7da; color: #721c24; }
+                  .status.success { background: #d4edda; color: #155724; }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <h1>🔧 IAM Challenge - Permission Issues</h1>
+                  
+                  <?php if ($has_errors): ?>
+                  <div class="error">
+                      <h3>❌ Problem Identified</h3>
+                      <p>The application cannot access required AWS services due to insufficient IAM permissions.</p>
+                      <p><strong>Errors:</strong></p>
+                      <ul>
+                          <?php foreach ($errors as $error): ?>
+                          <li><?php echo htmlspecialchars($error); ?></li>
+                          <?php endforeach; ?>
+                      </ul>
+                  </div>
+                  <?php else: ?>
+                  <div class="success">
+                      <h3>✅ All Services Accessible</h3>
+                      <p>Great job! All AWS services are accessible.</p>
+                  </div>
+                  <?php endif; ?>
+                  
+                  <div class="challenge">
+                      <h3>🎯 Your Challenge</h3>
+                      <p><strong>Objective:</strong> Fix the IAM role permissions to allow access to required AWS services</p>
+                      <p><strong>Hint:</strong> Check the EC2 instance role and its attached policies</p>
+                      <p><strong>Expected Result:</strong> Application should be able to access S3 and CloudWatch Logs</p>
+                  </div>
+                  
+                  <div class="info">
+                      <h3>📊 Service Access Status</h3>
+                      <div class="status <?php echo $s3_status === 'Success' ? 'success' : 'failed'; ?>">
+                          <strong>S3 Access:</strong> <?php echo htmlspecialchars($s3_status); ?>
+                      </div>
+                      <div class="status <?php echo $cloudwatch_status === 'Success' ? 'success' : 'failed'; ?>">
+                          <strong>CloudWatch Logs Access:</strong> <?php echo htmlspecialchars($cloudwatch_status); ?>
+                      </div>
+                  </div>
+                  
+                  <div class="info">
+                      <h3>📋 Troubleshooting Steps</h3>
+                      <ol>
+                          <li>Check the EC2 instance role and attached policies</li>
+                          <li>Verify S3 bucket permissions</li>
+                          <li>Review CloudWatch Logs permissions</li>
+                          <li>Add required IAM policies to the role</li>
+                          <li>Test service access again</li>
+                      </ol>
+                  </div>
+                  
+                  <div class="info">
+                      <h3>🔍 Investigation Tools</h3>
+                      <ul>
+                          <li>AWS Console → IAM → Roles → EC2 Instance Role</li>
+                          <li>AWS Console → S3 → Bucket permissions</li>
+                          <li>AWS Console → CloudWatch → Log groups</li>
+                          <li>Check EC2 instance metadata for role information</li>
+                      </ul>
+                  </div>
+                  
+                  <div class="info">
+                      <h3>📝 Required Permissions</h3>
+                      <ul>
+                          <li><strong>S3:</strong> s3:GetObject, s3:PutObject, s3:ListBucket</li>
+                          <li><strong>CloudWatch Logs:</strong> logs:CreateLogGroup, logs:CreateLogStream, logs:PutLogEvents</li>
+                          <li><strong>Additional:</strong> CloudWatchAgentServerPolicy (managed policy)</li>
+                      </ul>
+                  </div>
+                  
+                  <p><em>IAM roles provide temporary credentials to EC2 instances for accessing AWS services!</em></p>
+              </div>
+          </body>
+          </html>
+          EOF
+          
+          # Create health check endpoint
+          echo "OK" > /var/www/html/health
+          
+          # Create a test script to verify AWS access
+          cat > /home/ec2-user/test-aws-access.sh << 'EOF'
+          #!/bin/bash
+          echo "Testing AWS service access..."
+          
+          echo "1. Testing S3 access..."
+          aws s3 ls s3://${ApplicationDataBucket} || echo "S3 access failed"
+          
+          echo "2. Testing CloudWatch Logs access..."
+          aws logs describe-log-groups --log-group-name-prefix /aws/ec2/ || echo "CloudWatch Logs access failed"
+          
+          echo "3. Testing EC2 instance metadata..."
+          curl -s http://169.254.169.254/latest/meta-data/iam/security-credentials/
+          EOF
+          
+          chmod +x /home/ec2-user/test-aws-access.sh
+          
+          # Set permissions
+          chown -R apache:apache /var/www/html
+          chmod -R 755 /var/www/html
+          
+          # Restart Apache
+          systemctl restart httpd
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-webserver'
+        - Key: Challenge
+          Value: 'IAM-Permission-Issues'
+
+Outputs:
+  PublicIP:
+    Description: Public IP of the web server
+    Value: !GetAtt WebServer.PublicIp
+
+  ApplicationURL:
+    Description: URL to access the application
+    Value: !Sub 'http://${WebServer.PublicIp}'
+
+  InstanceID:
+    Description: EC2 Instance ID for troubleshooting
+    Value: !Ref WebServer
+
+  EC2InstanceRoleArn:
+    Description: EC2 Instance Role ARN that needs IAM policies
+    Value: !GetAtt EC2InstanceRole.Arn
+
+  S3BucketName:
+    Description: S3 Bucket name for testing access
+    Value: !Ref ApplicationDataBucket
+
+  CloudWatchLogGroupName:
+    Description: CloudWatch Log Group name for testing access
+    Value: !Ref ApplicationLogGroup
+
+  ChallengeInstructions:
+    Description: Challenge instructions for students
+    Value: 'IAM Challenge: The EC2 instance role lacks permissions to access S3 and CloudWatch Logs. Students must add the required IAM policies to fix the access issues.'

@@ -1,0 +1,325 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Security Group Challenge - Security Group blocks load balancer health checks. Students must fix the configuration.'
+
+Parameters:
+  StudentEmail:
+    Type: String
+    Description: Student email address for resource tagging
+    Default: 'student@university.edu'
+  
+  Environment:
+    Type: String
+    Description: Environment name
+    Default: 'workshop'
+
+Resources:
+  # VPC and Networking
+  WorkshopVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-vpc'
+        - Key: Challenge
+          Value: 'SecurityGroup-Misconfiguration'
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-igw'
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref WorkshopVPC
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref WorkshopVPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-public-subnet'
+
+  # Route Table
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref WorkshopVPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-public-rt'
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet
+
+  # MISCONFIGURED Security Group - Blocks load balancer health checks
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for web tier - MISCONFIGURED
+      VpcId: !Ref WorkshopVPC
+      SecurityGroupIngress:
+        # WRONG: Only allows traffic from specific IP instead of load balancer
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 10.0.0.0/16  # This is too restrictive - blocks ALB health checks
+          Description: HTTP access - MISCONFIGURED
+        # MISSING: No rule to allow ALB health checks from ALB security group
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: All outbound traffic
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-web-sg'
+        - Key: Challenge
+          Value: 'Security group blocks ALB health checks'
+
+  # Load Balancer Security Group (Correctly configured)
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for load balancer
+      VpcId: !Ref WorkshopVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: HTTP access from internet
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: All outbound traffic
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-alb-sg'
+
+  # Launch Template
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub '${StudentEmail}-${Environment}-lt'
+      LaunchTemplateData:
+        ImageId: ami-0c02fb55956c7d316  # Amazon Linux 2 AMI
+        InstanceType: t2.micro
+        SecurityGroupIds:
+          - !Ref WebSecurityGroup  # This is the problematic security group
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            yum update -y
+            yum install -y httpd
+            
+            # Start Apache
+            systemctl start httpd
+            systemctl enable httpd
+            
+            # Create web application with health check
+            cat > /var/www/html/index.html << 'EOF'
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Security Group Challenge - Load Balancer Issue</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 40px; background: #f8f9fa; }
+                    .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                    .error { background: #dc3545; color: white; padding: 15px; border-radius: 5px; margin: 20px 0; }
+                    .challenge { background: #ffc107; color: #212529; padding: 15px; border-radius: 5px; margin: 20px 0; }
+                    .info { background: #d1ecf1; color: #0c5460; padding: 15px; border-radius: 5px; margin: 20px 0; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1>🔧 Security Group Challenge - Load Balancer Issue</h1>
+                    
+                    <div class="error">
+                        <h3>❌ Problem Identified</h3>
+                        <p>The load balancer health checks are failing, causing targets to be marked as unhealthy.</p>
+                        <p><strong>Symptoms:</strong> Load balancer shows unhealthy targets, application not accessible</p>
+                    </div>
+                    
+                    <div class="challenge">
+                        <h3>🎯 Your Challenge</h3>
+                        <p><strong>Objective:</strong> Fix the security group configuration to allow load balancer health checks</p>
+                        <p><strong>Hint:</strong> Check the security group rules for the web tier</p>
+                        <p><strong>Expected Result:</strong> Load balancer targets should be healthy and application accessible</p>
+                    </div>
+                    
+                    <div class="info">
+                        <h3>📋 Troubleshooting Steps</h3>
+                        <ol>
+                            <li>Check load balancer target group health</li>
+                            <li>Review security group rules for web instances</li>
+                            <li>Verify load balancer security group rules</li>
+                            <li>Check if ALB can reach instances on health check port</li>
+                            <li>Fix the security group configuration</li>
+                        </ol>
+                    </div>
+                    
+                    <div class="info">
+                        <h3>🔍 Investigation Tools</h3>
+                        <ul>
+                            <li>AWS Console → EC2 → Load Balancers → Target Groups</li>
+                            <li>AWS Console → EC2 → Security Groups</li>
+                            <li>Check target group health status</li>
+                            <li>Review security group inbound rules</li>
+                        </ul>
+                    </div>
+                    
+                    <p><em>Load balancer health checks come from the ALB's security group, not from the internet!</em></p>
+                </div>
+            </body>
+            </html>
+            EOF
+            
+            # Create health check endpoint
+            cat > /var/www/html/health << 'EOF'
+            OK
+            EOF
+            
+            # Create detailed health check
+            cat > /var/www/html/health.php << 'EOF'
+            <?php
+            header('Content-Type: application/json');
+            echo json_encode([
+                'status' => 'healthy',
+                'timestamp' => date('c'),
+                'server' => gethostname(),
+                'message' => 'Instance is healthy, but load balancer cannot reach due to security group'
+            ], JSON_PRETTY_PRINT);
+            ?>
+            EOF
+            
+            # Set permissions
+            chown -R apache:apache /var/www/html
+            chmod -R 755 /var/www/html
+            
+            # Restart Apache
+            systemctl restart httpd
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: Name
+                Value: !Sub '${StudentEmail}-${Environment}-web-server'
+              - Key: Challenge
+                Value: 'SecurityGroup-Misconfiguration'
+
+  # Application Load Balancer
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub '${StudentEmail}-${Environment}-alb'
+      Scheme: internet-facing
+      Type: application
+      SecurityGroups:
+        - !Ref LoadBalancerSecurityGroup
+      Subnets:
+        - !Ref PublicSubnet
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-alb'
+        - Key: Challenge
+          Value: 'SecurityGroup-Misconfiguration'
+
+  # Target Group with health checks
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub '${StudentEmail}-${Environment}-tg'
+      Port: 80
+      Protocol: HTTP
+      VpcId: !Ref WorkshopVPC
+      HealthCheckPath: /health
+      HealthCheckProtocol: HTTP
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+      TargetType: instance
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-tg'
+
+  # Load Balancer Listener
+  LoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  # Auto Scaling Group
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: !Sub '${StudentEmail}-${Environment}-asg'
+      VPCZoneIdentifier:
+        - !Ref PublicSubnet
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      MinSize: 1
+      MaxSize: 3
+      DesiredCapacity: 2
+      TargetGroupARNs:
+        - !Ref TargetGroup
+      HealthCheckType: ELB
+      HealthCheckGracePeriod: 300
+      Tags:
+        - Key: Name
+          Value: !Sub '${StudentEmail}-${Environment}-asg'
+          PropagateAtLaunch: true
+        - Key: Challenge
+          Value: 'SecurityGroup-Misconfiguration'
+          PropagateAtLaunch: true
+
+Outputs:
+  LoadBalancerDNS:
+    Description: DNS name of the load balancer (targets will be unhealthy)
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+
+  LoadBalancerURL:
+    Description: URL to access the application (will fail due to unhealthy targets)
+    Value: !Sub 'http://${ApplicationLoadBalancer.DNSName}'
+
+  TargetGroupARN:
+    Description: Target Group ARN for troubleshooting
+    Value: !Ref TargetGroup
+
+  WebSecurityGroupId:
+    Description: Web Security Group ID that needs to be fixed
+    Value: !Ref WebSecurityGroup
+
+  LoadBalancerSecurityGroupId:
+    Description: Load Balancer Security Group ID (correctly configured)
+    Value: !Ref LoadBalancerSecurityGroup
+
+  ChallengeInstructions:
+    Description: Challenge instructions for students
+    Value: 'Security Group Challenge: The web security group blocks ALB health checks. Students must modify security group rules to allow ALB to reach instances.'

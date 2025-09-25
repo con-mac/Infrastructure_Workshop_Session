@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workshop Instructor Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e1e5e9;
+        }
+        
+        .header h1 {
+            color: #667eea;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header h2 {
+            color: #666;
+            font-weight: 300;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            border-left: 4px solid #667eea;
+        }
+        
+        .stat-card h3 {
+            color: #667eea;
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        
+        .stat-card p {
+            color: #666;
+            font-size: 1.1em;
+        }
+        
+        .controls {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .controls h3 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: transform 0.2s ease;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .btn.danger {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        }
+        
+        .btn.success {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+        
+        .students-table {
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .table-header {
+            background: #667eea;
+            color: white;
+            padding: 20px;
+            font-size: 1.2em;
+            font-weight: 600;
+        }
+        
+        .table-content {
+            overflow-x: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #e1e5e9;
+        }
+        
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .status-badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .status-active {
+            background: rgba(40, 167, 69, 0.1);
+            color: #28a745;
+        }
+        
+        .status-pending {
+            background: rgba(255, 193, 7, 0.1);
+            color: #ffc107;
+        }
+        
+        .status-error {
+            background: rgba(220, 53, 69, 0.1);
+            color: #dc3545;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        
+        .modal-content {
+            background-color: white;
+            margin: 10% auto;
+            padding: 30px;
+            border-radius: 15px;
+            width: 80%;
+            max-width: 500px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e1e5e9;
+        }
+        
+        .modal-header h3 {
+            color: #667eea;
+            margin: 0;
+        }
+        
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close:hover {
+            color: #000;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            display: none;
+        }
+        
+        .alert.success {
+            background: rgba(40, 167, 69, 0.1);
+            border: 1px solid #28a745;
+            color: #155724;
+        }
+        
+        .alert.error {
+            background: rgba(220, 53, 69, 0.1);
+            border: 1px solid #dc3545;
+            color: #721c24;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎓 Workshop Instructor Dashboard</h1>
+            <h2>Infrastructure Workshop Management</h2>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3 id="totalStudents">0</h3>
+                <p>Total Students Registered</p>
+            </div>
+            <div class="stat-card">
+                <h3 id="activeAccounts">0</h3>
+                <p>Active Accounts</p>
+            </div>
+            <div class="stat-card">
+                <h3 id="totalCost">$0</h3>
+                <p>Total Workshop Cost</p>
+            </div>
+            <div class="stat-card">
+                <h3 id="capacityRemaining">20</h3>
+                <p>Capacity Remaining</p>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <h3>Workshop Management</h3>
+            <div class="button-group">
+                <button class="btn" onclick="refreshData()">🔄 Refresh Data</button>
+                <button class="btn success" onclick="openAddStudentModal()">➕ Add Student Manually</button>
+                <button class="btn" onclick="exportStudentList()">📊 Export Student List</button>
+                <button class="btn danger" onclick="openCleanupModal()">🧹 Workshop Cleanup</button>
+                <button class="btn" onclick="viewCosts()">💰 View Costs</button>
+                <button class="btn" onclick="sendReminderEmails()">📧 Send Reminders</button>
+            </div>
+        </div>
+        
+        <div class="students-table">
+            <div class="table-header">
+                📋 Registered Students
+            </div>
+            <div class="table-content">
+                <div class="loading" id="loadingIndicator">
+                    <div class="spinner"></div>
+                    <p>Loading student data...</p>
+                </div>
+                <table id="studentsTable" style="display: none;">
+                    <thead>
+                        <tr>
+                            <th>Student Name</th>
+                            <th>Email</th>
+                            <th>Account ID</th>
+                            <th>Status</th>
+                            <th>Registration Date</th>
+                            <th>Cost</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="studentsTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div class="alert success" id="successAlert">
+            <strong>Success!</strong> <span id="successMessage"></span>
+        </div>
+        
+        <div class="alert error" id="errorAlert">
+            <strong>Error!</strong> <span id="errorMessage"></span>
+        </div>
+    </div>
+    
+    <!-- Add Student Modal -->
+    <div id="addStudentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add Student Manually</h3>
+                <span class="close" onclick="closeModal('addStudentModal')">&times;</span>
+            </div>
+            <form id="addStudentForm">
+                <div class="form-group">
+                    <label for="studentName">Student Name</label>
+                    <input type="text" id="studentName" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="studentEmail">Email Address</label>
+                    <input type="email" id="studentEmail" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="studentId">Student ID (Optional)</label>
+                    <input type="text" id="studentId" name="studentId">
+                </div>
+                <button type="submit" class="btn success" style="width: 100%;">Create Account</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Cleanup Modal -->
+    <div id="cleanupModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Workshop Cleanup</h3>
+                <span class="close" onclick="closeModal('cleanupModal')">&times;</span>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="confirmCleanup"> 
+                    I understand this will delete all student accounts and cannot be undone
+                </label>
+            </div>
+            <div class="form-group">
+                <label for="cleanupReason">Reason for cleanup</label>
+                <select id="cleanupReason">
+                    <option value="workshop_complete">Workshop Completed</option>
+                    <option value="emergency_cleanup">Emergency Cleanup</option>
+                    <option value="cost_control">Cost Control</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            <button type="button" class="btn danger" onclick="performCleanup()" style="width: 100%;" disabled id="cleanupBtn">
+                🧹 Perform Cleanup
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Configuration - Replace with your actual API endpoints
+        const API_BASE_URL = 'YOUR_API_GATEWAY_URL_HERE';
+        const WORKSHOP_NAME = 'Infrastructure-Workshop-2024';
+        
+        // Global data
+        let studentsData = [];
+        
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            refreshData();
+            setupEventListeners();
+        });
+        
+        function setupEventListeners() {
+            // Add student form
+            document.getElementById('addStudentForm').addEventListener('submit', handleAddStudent);
+            
+            // Cleanup confirmation
+            document.getElementById('confirmCleanup').addEventListener('change', function() {
+                document.getElementById('cleanupBtn').disabled = !this.checked;
+            });
+        }
+        
+        async function refreshData() {
+            try {
+                showLoading(true);
+                
+                // Fetch student data
+                const response = await fetch(`${API_BASE_URL}/students`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    studentsData = data.students || [];
+                    updateDashboard(studentsData);
+                } else {
+                    throw new Error(data.error || 'Failed to fetch student data');
+                }
+            } catch (error) {
+                console.error('Error refreshing data:', error);
+                showError('Failed to refresh data: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        function updateDashboard(students) {
+            // Update statistics
+            document.getElementById('totalStudents').textContent = students.length;
+            document.getElementById('activeAccounts').textContent = students.filter(s => s.status === 'active').length;
+            
+            const totalCost = students.reduce((sum, student) => sum + (student.cost || 0), 0);
+            document.getElementById('totalCost').textContent = `$${totalCost.toFixed(2)}`;
+            
+            document.getElementById('capacityRemaining').textContent = Math.max(0, 20 - students.length);
+            
+            // Update students table
+            updateStudentsTable(students);
+        }
+        
+        function updateStudentsTable(students) {
+            const tbody = document.getElementById('studentsTableBody');
+            tbody.innerHTML = '';
+            
+            if (students.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px; color: #666;">No students registered yet</td></tr>';
+                document.getElementById('studentsTable').style.display = 'table';
+                return;
+            }
+            
+            students.forEach(student => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${student.name}</td>
+                    <td>${student.email}</td>
+                    <td>${student.accountId || 'N/A'}</td>
+                    <td><span class="status-badge status-${student.status}">${student.status}</span></td>
+                    <td>${formatDate(student.registrationDate)}</td>
+                    <td>$${(student.cost || 0).toFixed(2)}</td>
+                    <td>
+                        <button class="btn" onclick="viewStudentDetails('${student.email}')" style="padding: 5px 10px; font-size: 12px;">View</button>
+                        <button class="btn danger" onclick="deleteStudent('${student.email}')" style="padding: 5px 10px; font-size: 12px;">Delete</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+            
+            document.getElementById('studentsTable').style.display = 'table';
+        }
+        
+        async function handleAddStudent(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const studentData = {
+                name: formData.get('name'),
+                email: formData.get('email'),
+                studentId: formData.get('studentId') || null
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/students`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(studentData)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showSuccess('Student account created successfully!');
+                    closeModal('addStudentModal');
+                    e.target.reset();
+                    refreshData();
+                } else {
+                    throw new Error(result.error || 'Failed to create student account');
+                }
+            } catch (error) {
+                console.error('Error adding student:', error);
+                showError('Failed to add student: ' + error.message);
+            }
+        }
+        
+        function openAddStudentModal() {
+            document.getElementById('addStudentModal').style.display = 'block';
+        }
+        
+        function openCleanupModal() {
+            document.getElementById('cleanupModal').style.display = 'block';
+        }
+        
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+        
+        async function performCleanup() {
+            const reason = document.getElementById('cleanupReason').value;
+            
+            if (!confirm('Are you absolutely sure you want to delete all student accounts? This action cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/cleanup`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ reason: reason })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showSuccess('Workshop cleanup completed successfully!');
+                    closeModal('cleanupModal');
+                    refreshData();
+                } else {
+                    throw new Error(result.error || 'Cleanup failed');
+                }
+            } catch (error) {
+                console.error('Error during cleanup:', error);
+                showError('Cleanup failed: ' + error.message);
+            }
+        }
+        
+        function exportStudentList() {
+            if (studentsData.length === 0) {
+                showError('No students to export');
+                return;
+            }
+            
+            const csv = convertToCSV(studentsData);
+            downloadCSV(csv, 'workshop-students.csv');
+            showSuccess('Student list exported successfully!');
+        }
+        
+        function convertToCSV(data) {
+            const headers = ['Name', 'Email', 'Account ID', 'Status', 'Registration Date', 'Cost'];
+            const rows = data.map(student => [
+                student.name,
+                student.email,
+                student.accountId || '',
+                student.status,
+                formatDate(student.registrationDate),
+                (student.cost || 0).toFixed(2)
+            ]);
+            
+            return [headers, ...rows].map(row => 
+                row.map(field => `"${field}"`).join(',')
+            ).join('\n');
+        }
+        
+        function downloadCSV(csv, filename) {
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+        
+        async function viewCosts() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/costs`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const costDetails = data.costs;
+                    alert(`Cost Breakdown:
+                    
+Total Workshop Cost: $${costDetails.total.toFixed(2)}
+Infrastructure Cost: $${costDetails.infrastructure.toFixed(2)}
+Student Accounts: $${costDetails.studentAccounts.toFixed(2)}
+Average per Student: $${costDetails.averagePerStudent.toFixed(2)}
+
+Breakdown by Service:
+${Object.entries(costDetails.byService).map(([service, cost]) => `${service}: $${cost.toFixed(2)}`).join('\n')}`);
+                } else {
+                    throw new Error(data.error || 'Failed to fetch cost data');
+                }
+            } catch (error) {
+                console.error('Error fetching costs:', error);
+                showError('Failed to fetch cost data: ' + error.message);
+            }
+        }
+        
+        async function sendReminderEmails() {
+            if (!confirm('Send reminder emails to all registered students?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/reminders`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showSuccess(`Reminder emails sent to ${result.count} students!`);
+                } else {
+                    throw new Error(result.error || 'Failed to send reminder emails');
+                }
+            } catch (error) {
+                console.error('Error sending reminders:', error);
+                showError('Failed to send reminder emails: ' + error.message);
+            }
+        }
+        
+        function viewStudentDetails(email) {
+            const student = studentsData.find(s => s.email === email);
+            if (!student) return;
+            
+            alert(`Student Details:
+            
+Name: ${student.name}
+Email: ${student.email}
+Account ID: ${student.accountId || 'N/A'}
+Status: ${student.status}
+Registration Date: ${formatDate(student.registrationDate)}
+Student ID: ${student.studentId || 'N/A'}
+Cost: $${(student.cost || 0).toFixed(2)}
+
+Last Activity: ${student.lastActivity || 'N/A'}
+Resources Created: ${student.resourceCount || 0}`);
+        }
+        
+        async function deleteStudent(email) {
+            if (!confirm(`Are you sure you want to delete the account for ${email}?`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/students/${encodeURIComponent(email)}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showSuccess('Student account deleted successfully!');
+                    refreshData();
+                } else {
+                    throw new Error(result.error || 'Failed to delete student account');
+                }
+            } catch (error) {
+                console.error('Error deleting student:', error);
+                showError('Failed to delete student account: ' + error.message);
+            }
+        }
+        
+        function showLoading(show) {
+            document.getElementById('loadingIndicator').style.display = show ? 'block' : 'none';
+            document.getElementById('studentsTable').style.display = show ? 'none' : 'table';
+        }
+        
+        function showSuccess(message) {
+            const alert = document.getElementById('successAlert');
+            const messageEl = document.getElementById('successMessage');
+            messageEl.textContent = message;
+            alert.style.display = 'block';
+            
+            setTimeout(() => {
+                alert.style.display = 'none';
+            }, 5000);
+        }
+        
+        function showError(message) {
+            const alert = document.getElementById('errorAlert');
+            const messageEl = document.getElementById('errorMessage');
+            messageEl.textContent = message;
+            alert.style.display = 'block';
+            
+            setTimeout(() => {
+                alert.style.display = 'none';
+            }, 5000);
+        }
+        
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            return new Date(dateString).toLocaleDateString();
+        }
+        
+        // Close modals when clicking outside
+        window.onclick = function(event) {
+            const modals = document.querySelectorAll('.modal');
+            modals.forEach(modal => {
+                if (event.target === modal) {
+                    modal.style.display = 'none';
+                }
+            });
+        }
+        
+        // Auto-refresh every 5 minutes
+        setInterval(refreshData, 300000);
+    </script>
+</body>
+</html>

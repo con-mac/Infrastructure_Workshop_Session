@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS Infrastructure Workshop - Student Registration</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            max-width: 600px;
+            width: 100%;
+            color: #333;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            color: #667eea;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header h2 {
+            color: #666;
+            font-weight: 300;
+            margin-bottom: 20px;
+        }
+        
+        .workshop-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .workshop-info h3 {
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        
+        .workshop-info ul {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .workshop-info li {
+            margin-bottom: 8px;
+            padding-left: 20px;
+            position: relative;
+        }
+        
+        .workshop-info li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        
+        .form-container {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 25px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+        
+        input[type="email"], 
+        input[type="text"] {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+            background: white;
+        }
+        
+        input[type="email"]:focus, 
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            width: 100%;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(76, 175, 80, 0.3);
+        }
+        
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .alert {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+        
+        .alert.success {
+            background: rgba(76, 175, 80, 0.1);
+            border: 2px solid #4CAF50;
+            color: #2e7d32;
+        }
+        
+        .alert.error {
+            background: rgba(244, 67, 54, 0.1);
+            border: 2px solid #f44336;
+            color: #c62828;
+        }
+        
+        .alert.info {
+            background: rgba(33, 150, 243, 0.1);
+            border: 2px solid #2196F3;
+            color: #1565c0;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        
+        .process-steps {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-top: 20px;
+        }
+        
+        .process-steps h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .step {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 8px;
+            transition: background-color 0.3s ease;
+        }
+        
+        .step.active {
+            background: rgba(102, 126, 234, 0.1);
+        }
+        
+        .step.completed {
+            background: rgba(76, 175, 80, 0.1);
+        }
+        
+        .step-number {
+            background: #667eea;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+        
+        .step.completed .step-number {
+            background: #4CAF50;
+        }
+        
+        .step-text {
+            flex: 1;
+            font-size: 14px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e1e5e9;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        
+        .footer a:hover {
+            text-decoration: underline;
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 AWS Infrastructure Workshop</h1>
+            <h2>Student Account Registration</h2>
+        </div>
+        
+        <div class="workshop-info">
+            <h3>Workshop Details</h3>
+            <ul>
+                <li>Hands-on AWS console experience</li>
+                <li>Challenge-based learning approach</li>
+                <li>Real-world troubleshooting scenarios</li>
+                <li>Individual AWS accounts for each student</li>
+                <li>Automated setup and cleanup</li>
+            </ul>
+        </div>
+        
+        <div class="alert success" id="successMessage">
+            <strong>✅ Success!</strong> Your AWS account has been created successfully. Check your email for login details and next steps.
+        </div>
+        
+        <div class="alert error" id="errorMessage">
+            <strong>❌ Registration Failed</strong> <span id="errorText"></span>
+        </div>
+        
+        <div class="alert info" id="infoMessage">
+            <strong>ℹ️ Information</strong> <span id="infoText"></span>
+        </div>
+        
+        <div class="form-container">
+            <form id="registrationForm">
+                <div class="form-group">
+                    <label for="email">University Email Address *</label>
+                    <input type="email" id="email" name="email" required 
+                           placeholder="your.name@university.edu"
+                           pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$">
+                </div>
+                
+                <div class="form-group">
+                    <label for="name">Full Name *</label>
+                    <input type="text" id="name" name="name" required 
+                           placeholder="John Smith"
+                           minlength="2"
+                           maxlength="50">
+                </div>
+                
+                <div class="form-group">
+                    <label for="studentId">Student ID (Optional)</label>
+                    <input type="text" id="studentId" name="studentId" 
+                           placeholder="12345678"
+                           maxlength="20">
+                </div>
+                
+                <button type="submit" class="btn" id="submitBtn">
+                    Create My AWS Account
+                </button>
+            </form>
+        </div>
+        
+        <div class="loading" id="loadingIndicator">
+            <div class="spinner"></div>
+            <p>Creating your AWS account...</p>
+        </div>
+        
+        <div class="process-steps">
+            <h3>What happens next?</h3>
+            
+            <div class="step" id="step1">
+                <div class="step-number">1</div>
+                <div class="step-text">We create a dedicated AWS account for you</div>
+            </div>
+            
+            <div class="step" id="step2">
+                <div class="step-number">2</div>
+                <div class="step-text">Your account is configured with workshop settings</div>
+            </div>
+            
+            <div class="step" id="step3">
+                <div class="step-number">3</div>
+                <div class="step-text">You receive an email with login details</div>
+            </div>
+            
+            <div class="step" id="step4">
+                <div class="step-number">4</div>
+                <div class="step-text">Your account is ready for the workshop!</div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>
+                <strong>Important:</strong> Your account will have a $50 spending limit and will be automatically cleaned up after the workshop.
+            </p>
+            <p>
+                Need help? Contact your instructor or visit our 
+                <a href="#" onclick="showHelp()">help page</a>.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Configuration - Replace with your actual API Gateway URL
+        const API_BASE_URL = 'YOUR_API_GATEWAY_URL_HERE';
+        
+        // Form submission handler
+        document.getElementById('registrationForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value.trim();
+            const name = document.getElementById('name').value.trim();
+            const studentId = document.getElementById('studentId').value.trim();
+            
+            // Validate inputs
+            if (!email || !name) {
+                showError('Please fill in all required fields.');
+                return;
+            }
+            
+            if (!isValidEmail(email)) {
+                showError('Please enter a valid email address.');
+                return;
+            }
+            
+            // Show loading state
+            showLoading(true);
+            hideAlerts();
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        name: name,
+                        studentId: studentId || null
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    // Success
+                    showSuccess();
+                    updateProcessSteps(true);
+                    document.getElementById('registrationForm').reset();
+                } else {
+                    // Error
+                    throw new Error(result.error || result.message || 'Registration failed');
+                }
+            } catch (error) {
+                console.error('Registration error:', error);
+                showError(error.message);
+            } finally {
+                showLoading(false);
+            }
+        });
+        
+        // Helper functions
+        function isValidEmail(email) {
+            const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+            return emailRegex.test(email);
+        }
+        
+        function showLoading(show) {
+            const loading = document.getElementById('loadingIndicator');
+            const submitBtn = document.getElementById('submitBtn');
+            
+            if (show) {
+                loading.style.display = 'block';
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Creating Account...';
+            } else {
+                loading.style.display = 'none';
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Create My AWS Account';
+            }
+        }
+        
+        function showSuccess() {
+            const success = document.getElementById('successMessage');
+            success.style.display = 'block';
+            
+            // Scroll to success message
+            success.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        function showError(message) {
+            const error = document.getElementById('errorMessage');
+            const errorText = document.getElementById('errorText');
+            
+            errorText.textContent = message;
+            error.style.display = 'block';
+            
+            // Scroll to error message
+            error.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        function showInfo(message) {
+            const info = document.getElementById('infoMessage');
+            const infoText = document.getElementById('infoText');
+            
+            infoText.textContent = message;
+            info.style.display = 'block';
+        }
+        
+        function hideAlerts() {
+            document.getElementById('successMessage').style.display = 'none';
+            document.getElementById('errorMessage').style.display = 'none';
+            document.getElementById('infoMessage').style.display = 'none';
+        }
+        
+        function updateProcessSteps(success) {
+            const steps = document.querySelectorAll('.step');
+            
+            if (success) {
+                steps.forEach((step, index) => {
+                    setTimeout(() => {
+                        step.classList.add('completed');
+                        step.classList.remove('active');
+                    }, index * 500);
+                });
+            } else {
+                steps.forEach(step => {
+                    step.classList.remove('completed', 'active');
+                });
+            }
+        }
+        
+        function showHelp() {
+            alert(`AWS Workshop Registration Help
+
+If you're having trouble registering:
+
+1. Make sure you're using your university email address
+2. Check that your email address is spelled correctly
+3. Ensure you have a stable internet connection
+4. Try refreshing the page and registering again
+
+If problems persist, contact your instructor with:
+- Your email address
+- Any error messages you see
+- What step you were on when it failed
+
+Technical Requirements:
+- Modern web browser (Chrome, Firefox, Safari, Edge)
+- JavaScript enabled
+- Stable internet connection`);
+        }
+        
+        // Real-time email validation
+        document.getElementById('email').addEventListener('blur', function() {
+            const email = this.value.trim();
+            if (email && !isValidEmail(email)) {
+                this.style.borderColor = '#f44336';
+                showInfo('Please enter a valid email address format.');
+            } else {
+                this.style.borderColor = '#e1e5e9';
+                hideAlerts();
+            }
+        });
+        
+        // Real-time name validation
+        document.getElementById('name').addEventListener('blur', function() {
+            const name = this.value.trim();
+            if (name && name.length < 2) {
+                this.style.borderColor = '#f44336';
+                showInfo('Please enter your full name (at least 2 characters).');
+            } else {
+                this.style.borderColor = '#e1e5e9';
+                hideAlerts();
+            }
+        });
+        
+        // Clear validation styling on input
+        document.querySelectorAll('input').forEach(input => {
+            input.addEventListener('input', function() {
+                this.style.borderColor = '#e1e5e9';
+            });
+        });
+    </script>
+</body>
+</html>
