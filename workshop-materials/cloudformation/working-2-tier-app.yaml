@@ -85,36 +85,21 @@ Resources:
         - Key: Workshop
           Value: 'Infrastructure-2024'
 
-  # Private Subnet
-  PrivateSubnet:
+  # Additional Public Subnet for High Availability
+  PublicSubnet2:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref WorkshopVPC
       CidrBlock: 10.0.2.0/24
       AvailabilityZone: !Select [1, !GetAZs '']
+      MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub '${StudentEmail}-${Environment}-private-subnet'
+          Value: !Sub '${StudentEmail}-${Environment}-public-subnet-2'
         - Key: Type
-          Value: 'Private'
+          Value: 'Public'
         - Key: Workshop
           Value: 'Infrastructure-2024'
-
-  # NAT Gateway for private subnet access
-  NatGatewayEIP:
-    Type: AWS::EC2::EIP
-    DependsOn: InternetGatewayAttachment
-    Properties:
-      Domain: vpc
-
-  NatGateway:
-    Type: AWS::EC2::NatGateway
-    Properties:
-      AllocationId: !GetAtt NatGatewayEIP.AllocationId
-      SubnetId: !Ref PublicSubnet
-      Tags:
-        - Key: Name
-          Value: !Sub '${StudentEmail}-${Environment}-nat-gateway'
 
   # Route Tables
   PublicRouteTable:
@@ -139,26 +124,28 @@ Resources:
       RouteTableId: !Ref PublicRouteTable
       SubnetId: !Ref PublicSubnet
 
-  PrivateRouteTable:
+  # Route Table for second public subnet
+  PublicRouteTable2:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref WorkshopVPC
       Tags:
         - Key: Name
-          Value: !Sub '${StudentEmail}-${Environment}-private-rt'
+          Value: !Sub '${StudentEmail}-${Environment}-public-rt-2'
 
-  DefaultPrivateRoute:
+  DefaultPublicRoute2:
     Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
     Properties:
-      RouteTableId: !Ref PrivateRouteTable
+      RouteTableId: !Ref PublicRouteTable2
       DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref NatGateway
+      GatewayId: !Ref InternetGateway
 
-  PrivateSubnetRouteTableAssociation:
+  PublicSubnet2RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref PrivateRouteTable
-      SubnetId: !Ref PrivateSubnet
+      RouteTableId: !Ref PublicRouteTable2
+      SubnetId: !Ref PublicSubnet2
 
   # Network ACLs (Default - Allowing all traffic)
   PublicNetworkAcl:
@@ -400,7 +387,7 @@ Resources:
         - !Ref WebSecurityGroup
       Subnets:
         - !Ref PublicSubnet
-        - !Ref PrivateSubnet
+        - !Ref PublicSubnet2
       Tags:
         - Key: Name
           Value: !Sub '${StudentEmail}-${Environment}-alb'
@@ -446,6 +433,7 @@ Resources:
       AutoScalingGroupName: !Sub '${StudentEmail}-${Environment}-asg'
       VPCZoneIdentifier:
         - !Ref PublicSubnet
+        - !Ref PublicSubnet2
       LaunchTemplate:
         LaunchTemplateId: !Ref LaunchTemplate
         Version: !GetAtt LaunchTemplate.LatestVersionNumber
@@ -464,15 +452,15 @@ Resources:
           Value: 'Infrastructure-2024'
           PropagateAtLaunch: true
 
-  # Database Subnet Group
+  # Database Subnet Group (using public subnets for cost optimization)
   DatabaseSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
     Properties:
       DBSubnetGroupName: !Sub '${StudentEmail}-${Environment}-db-subnet-group'
       DBSubnetGroupDescription: Subnet group for workshop database
       SubnetIds:
-        - !Ref PrivateSubnet
         - !Ref PublicSubnet
+        - !Ref PublicSubnet2
       Tags:
         - Key: Name
           Value: !Sub '${StudentEmail}-${Environment}-db-subnet-group'

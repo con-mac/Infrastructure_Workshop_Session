@@ -155,17 +155,18 @@ This comprehensive AWS Infrastructure Workshop has been completely revised to fo
 
 ## 💰 Cost Management
 
-### Estimated Costs (20 Students, 1 Day)
-- **Student AWS Accounts:** $360-560 total
+### Estimated Costs (8 Students, 6 Hours Total)
+- **Student AWS Accounts:** $1.84 total
 - **Automation Infrastructure:** $0.76 total
-- **Grand Total:** $360-561
+- **Grand Total:** $2.60
 
 ### Cost Control Features
-- **Individual Budgets:** $50 limit per student account
+- **Individual Budgets:** $10 limit per student account
 - **Service Control Policies:** Restrict expensive services
 - **Automated Cleanup:** Delete resources after workshop
 - **Real-time Monitoring:** Track costs and usage
 - **Budget Alerts:** Notify when approaching limits
+- **Free Tier Optimization:** Maximize free tier usage
 
 ---
 
@@ -179,7 +180,7 @@ Master Account (Instructor)
 ├── Workshop OU
 │   ├── Student Account 1
 │   ├── Student Account 2
-│   └── ... (up to 20 students)
+│   └── ... (up to 8 students)
 ```
 
 ### Challenge Architecture
@@ -264,12 +265,12 @@ Email Registration → API Gateway → Lambda → Organizations → IAM Identity
 2. **Account Access:** Login and initial setup
 3. **Baseline Deployment:** Working application deployment
 
-### Phase 2: Challenges (3 hours)
+### Phase 2: Challenges (2.5 hours)
 1. **NACL Challenge:** Network troubleshooting (30 minutes)
 2. **Security Group Challenge:** Load balancer issues (30 minutes)
 3. **IAM Challenge:** Permission problems (30 minutes)
 4. **Load Balancer Challenge:** Health check configuration (30 minutes)
-5. **Blue-Green Deployment:** Deployment strategies (45 minutes)
+5. **Blue-Green Deployment:** Deployment strategies (30 minutes)
 
 ### Phase 3: Cleanup (10 minutes)
 1. **Resource Cleanup:** Delete all workshop resources

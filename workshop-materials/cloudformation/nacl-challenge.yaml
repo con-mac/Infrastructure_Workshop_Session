@@ -52,6 +52,8 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub '${StudentEmail}-${Environment}-public-subnet'
+        - Key: Workshop
+          Value: 'Infrastructure-2024'
 
   # Route Table for public subnet
   PublicRouteTable:

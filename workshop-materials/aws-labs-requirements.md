@@ -25,9 +25,10 @@ This document outlines the requirements for a revised IT Infrastructure Workshop
 - **Web browser access required**
 
 ### Duration
-- **Total:** 4.5 hours
-- **Theory:** 1.5 hours (AWS concepts, console navigation)
-- **Practical:** 3 hours (hands-on challenges and troubleshooting)
+- **Total:** 3 hours (workshop day)
+- **Setup:** 4 days before (testing and preparation)
+- **Theory:** 30 minutes (AWS concepts, console navigation)
+- **Practical:** 2.5 hours (hands-on challenges and troubleshooting)
 
 ---
 
@@ -58,7 +59,7 @@ Master Account (Instructor)
 │   ├── Student Account 1 (Student-001)
 │   ├── Student Account 2 (Student-002)
 │   ├── Student Account 3 (Student-003)
-│   └── ... (up to 20 students)
+│   └── ... (up to 8 students)
 ```
 
 ### Benefits of AWS Organizations Approach
@@ -300,23 +301,23 @@ Master Account (Instructor)
 ## Cost Management
 
 ### Estimated Costs per Student
-- **EC2 Instances:** $5-8 (t2.micro, 4-6 hours)
-- **RDS Instance:** $3-5 (db.t3.micro, 4-6 hours)
-- **Load Balancer:** $8-12 (ALB, 4-6 hours)
-- **Data Transfer:** $2-3 (minimal usage)
-- **Total per Student:** $18-28 for 4-6 hours
+- **EC2 Instances:** $0.00 (t2.micro, free tier - 750 hours/month)
+- **RDS Instance:** $0.00 (db.t3.micro, free tier - 750 hours/month)
+- **Load Balancer:** $0.18 (ALB, 6 hours total)
+- **Data Transfer:** $0.05 (minimal usage)
+- **Total per Student:** $0.23 for 6 hours total
 
 ### Cost Control Measures
-- **AWS Budgets:** Set $50 limit per student account
+- **AWS Budgets:** Set $10 limit per student account
 - **Service Control Policies:** Restrict expensive services
 - **Automated Cleanup:** Delete resources after workshop
 - **Monitoring:** Real-time cost tracking
 - **Alerts:** Notify when approaching limits
 
 ### Total Workshop Cost
-- **20 Students:** $360-560 total
-- **Additional Overhead:** $50-100 (monitoring, tools)
-- **Grand Total:** $410-660 for complete workshop
+- **8 Students:** $1.84 total
+- **Additional Overhead:** $0.76 (automation infrastructure)
+- **Grand Total:** $2.60 for complete workshop
 
 ---
 

@@ -442,6 +442,8 @@
         // Configuration - Replace with your actual API endpoints
         const API_BASE_URL = 'YOUR_API_GATEWAY_URL_HERE';
         const WORKSHOP_NAME = 'Infrastructure-Workshop-2024';
+        const MAX_STUDENTS = 8;
+        const BUDGET_LIMIT = 10.00;
         
         // Global data
         let studentsData = [];
@@ -492,7 +494,7 @@
             const totalCost = students.reduce((sum, student) => sum + (student.cost || 0), 0);
             document.getElementById('totalCost').textContent = `$${totalCost.toFixed(2)}`;
             
-            document.getElementById('capacityRemaining').textContent = Math.max(0, 20 - students.length);
+            document.getElementById('capacityRemaining').textContent = Math.max(0, MAX_STUDENTS - students.length);
             
             // Update students table
             updateStudentsTable(students);

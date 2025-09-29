@@ -22,8 +22,8 @@ cloudformation = boto3.client('cloudformation')
 # Configuration
 WORKSHOP_NAME = 'Infrastructure-Workshop-2024'
 WORKSHOP_DURATION_DAYS = 7
-MAX_STUDENTS = 20
-BUDGET_LIMIT = 50.00
+MAX_STUDENTS = 8
+BUDGET_LIMIT = 10.00
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
