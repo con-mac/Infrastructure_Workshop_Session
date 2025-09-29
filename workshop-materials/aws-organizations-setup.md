@@ -143,9 +143,204 @@ Create a policy to limit expensive services:
 
 ## Step 3: Deploy Automation Infrastructure
 
-### CloudFormation Template for Automation
+### Overview
 
-Create a CloudFormation template to deploy the automation infrastructure:
+This step deploys the automation infrastructure that handles student account creation, registration website, and workshop management. The infrastructure includes:
+
+- **S3 Bucket:** Hosts the student registration website
+- **Lambda Function:** Handles automated account creation
+- **API Gateway:** Provides the registration API endpoint
+- **IAM Roles:** Manages permissions for automation
+- **CloudWatch:** Monitors the automation system
+
+### Step 3.1: Access CloudFormation Console
+
+1. **Navigate to CloudFormation**
+   - Go to AWS Console → Services → CloudFormation
+   - Click "Create stack"
+   - Select "Upload a template file"
+
+2. **Upload Template**
+   - Click "Choose file"
+   - Select the `automation-infrastructure.yaml` file
+   - Click "Next"
+
+### Step 3.2: Configure Stack Parameters
+
+Fill in the following parameters (all have defaults but should be customized):
+
+#### **Required Parameters:**
+
+**Workshop Name:**
+- **Default:** `Infrastructure-Workshop-2024`
+- **Description:** Name used for all resource naming
+- **Your Value:** Keep default or customize (e.g., `My-Company-Workshop-2024`)
+
+**Max Students:**
+- **Default:** `8`
+- **Description:** Maximum number of student accounts
+- **Your Value:** `8` (or adjust based on your needs)
+
+**Budget Limit:**
+- **Default:** `10.00`
+- **Description:** Budget limit per student account in USD
+- **Your Value:** `10.00` (cost-optimized for free tier)
+
+**Email Domain:**
+- **Default:** `yourdomain.com`
+- **Description:** Your email domain for SES (must be verified)
+- **Your Value:** Replace with your actual domain (e.g., `mycompany.com`)
+
+**Workshop OU ID:**
+- **Default:** `ou-xxxx-xxxxxxxx`
+- **Description:** AWS Organizations OU ID (optional)
+- **Your Value:** Leave as default for now, update later if needed
+
+**AWS Region:**
+- **Default:** `us-east-1`
+- **Description:** AWS Region for deployment
+- **Your Value:** Choose your preferred region
+
+**Notification Email:**
+- **Default:** `instructor@yourdomain.com`
+- **Description:** Email for workshop notifications
+- **Your Value:** Your instructor email address
+
+### Step 3.3: Configure Stack Options
+
+1. **Stack Name**
+   - Enter: `Workshop-Automation-Infrastructure`
+   - This will be used to identify your stack
+
+2. **Tags (Optional)**
+   - Add tags for cost tracking:
+     - Key: `Workshop`, Value: `Infrastructure-2024`
+     - Key: `Environment`, Value: `Production`
+     - Key: `Owner`, Value: `Your-Name`
+
+3. **Permissions**
+   - Leave as default (use stack policy)
+   - This is fine for workshop purposes
+
+4. **Advanced Options**
+   - Leave all defaults
+   - No additional configuration needed
+
+### Step 3.4: Review and Deploy
+
+1. **Review Configuration**
+   - Check all parameters are correct
+   - Verify email domain and notification email
+   - Ensure region is correct
+
+2. **Acknowledge Capabilities**
+   - Check "I acknowledge that AWS CloudFormation might create IAM resources"
+   - Check "I acknowledge that AWS CloudFormation might create IAM resources with custom names"
+   - These are required for Lambda and API Gateway
+
+3. **Create Stack**
+   - Click "Create stack"
+   - Wait for deployment (5-10 minutes)
+   - Monitor the Events tab for progress
+
+### Step 3.5: Verify Deployment
+
+1. **Check Stack Status**
+   - Go to CloudFormation → Stacks
+   - Find your stack: `Workshop-Automation-Infrastructure`
+   - Status should be: `CREATE_COMPLETE`
+
+2. **Review Outputs**
+   - Click on your stack
+   - Go to "Outputs" tab
+   - Note down these important values:
+     - **RegistrationWebsiteURL:** Student registration website
+     - **RegistrationAPIURL:** API endpoint for registration
+     - **LambdaFunctionName:** Lambda function name
+     - **DashboardURL:** Monitoring dashboard
+
+3. **Test Basic Functionality**
+   - Click on the **RegistrationWebsiteURL**
+   - Should see the student registration page
+   - Form should load (don't submit yet - need to configure email first)
+
+### Step 3.6: Update Lambda Function Code
+
+The deployed Lambda function contains placeholder code. You need to update it with the full account creation logic:
+
+1. **Download Full Lambda Code**
+   - Go to the `automation/lambda-account-creation.py` file
+   - Copy the entire contents
+
+2. **Update Lambda Function**
+   - Go to Lambda → Functions
+   - Find: `Infrastructure-Workshop-2024-account-creation`
+   - Click on the function name
+   - Go to "Code" tab
+   - Click "Edit"
+   - Replace the placeholder code with the full code from `lambda-account-creation.py`
+   - Click "Deploy"
+
+3. **Verify Update**
+   - Test the function with a sample event
+   - Check CloudWatch logs for any errors
+
+### Step 3.7: Configure S3 Website
+
+1. **Upload Student Registration Website**
+   - Go to S3 → Buckets
+   - Find: `infrastructure-workshop-2024-registration-[account-id]`
+   - Upload the `student-registration.html` file
+   - Rename it to `index.html`
+   - Set permissions to public read
+
+2. **Test Website**
+   - Go to the **RegistrationWebsiteURL** from outputs
+   - Should see the full registration form
+   - Form should be styled and functional
+
+### Troubleshooting Common Issues
+
+#### **Stack Creation Fails**
+- **Check IAM permissions:** Ensure you have CloudFormation, Lambda, and API Gateway permissions
+- **Check region:** Ensure you're in the correct region
+- **Check parameters:** Verify all required parameters are filled correctly
+
+#### **Lambda Function Errors**
+- **Check IAM role:** Ensure the Lambda role has required permissions
+- **Check environment variables:** Verify all environment variables are set
+- **Check CloudWatch logs:** Look for specific error messages
+
+#### **API Gateway Issues**
+- **Check Lambda permissions:** Ensure API Gateway can invoke Lambda
+- **Check CORS:** Add CORS headers if needed
+- **Check integration:** Verify Lambda integration is correct
+
+#### **S3 Website Not Loading**
+- **Check bucket policy:** Ensure public read access is enabled
+- **Check website configuration:** Verify index document is set
+- **Check file permissions:** Ensure files are publicly readable
+
+### Next Steps
+
+After successful deployment:
+
+1. **Configure SES** (Step 4) - Set up email verification
+2. **Test Registration** (Step 5) - Verify end-to-end functionality
+3. **Set Up Monitoring** (Step 6) - Configure alerts and dashboards
+
+### Cost Impact
+
+This automation infrastructure will cost approximately **$0.76 per month**:
+- **Lambda:** $0.00 (within free tier)
+- **API Gateway:** $0.00 (within free tier)
+- **S3:** $0.00 (within free tier)
+- **CloudWatch:** $0.00 (within free tier)
+- **Total:** $0.76/month for monitoring and logs
+
+---
+
+## Step 4: Configure Email (SES)
 
 ```yaml
 AWSTemplateFormatVersion: '2010-09-09'

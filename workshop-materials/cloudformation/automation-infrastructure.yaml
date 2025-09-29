@@ -1,0 +1,359 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Workshop Student Account Creation Automation Infrastructure - Deploy this to set up automated account creation for 8 students'
+
+Parameters:
+  WorkshopName:
+    Type: String
+    Default: 'Infrastructure-Workshop-2024'
+    Description: 'Name of the workshop (used for resource naming)'
+    AllowedPattern: '^[a-zA-Z0-9-]+$'
+    ConstraintDescription: 'Must contain only alphanumeric characters and hyphens'
+
+  MaxStudents:
+    Type: Number
+    Default: 8
+    Description: 'Maximum number of student accounts to create'
+    MinValue: 1
+    MaxValue: 20
+    ConstraintDescription: 'Must be between 1 and 20 students'
+
+  BudgetLimit:
+    Type: Number
+    Default: 10.00
+    Description: 'Budget limit per student account in USD'
+    MinValue: 1.00
+    MaxValue: 100.00
+    ConstraintDescription: 'Must be between $1 and $100'
+
+  EmailDomain:
+    Type: String
+    Default: 'yourdomain.com'
+    Description: 'Your email domain for SES (must be verified in SES)'
+    AllowedPattern: '^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    ConstraintDescription: 'Must be a valid domain name (e.g., yourdomain.com)'
+
+  WorkshopOUId:
+    Type: String
+    Default: 'ou-xxxx-xxxxxxxx'
+    Description: 'AWS Organizations OU ID for student accounts (optional - can be updated later)'
+    AllowedPattern: '^ou-[a-z0-9-]+$'
+    ConstraintDescription: 'Must be a valid OU ID format (e.g., ou-xxxx-xxxxxxxx)'
+
+  AWSRegion:
+    Type: String
+    Default: 'us-east-1'
+    Description: 'AWS Region for deployment'
+    AllowedValues:
+      - us-east-1
+      - us-west-2
+      - eu-west-1
+      - ap-southeast-1
+    ConstraintDescription: 'Must be a supported AWS region'
+
+  NotificationEmail:
+    Type: String
+    Default: 'instructor@yourdomain.com'
+    Description: 'Email address for workshop notifications and alerts'
+    AllowedPattern: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    ConstraintDescription: 'Must be a valid email address'
+
+Conditions:
+  IsWorkshopOUProvided: !Not [!Equals [!Ref WorkshopOUId, 'ou-xxxx-xxxxxxxx']]
+
+Resources:
+  # S3 Bucket for Student Registration Website
+  RegistrationWebsiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${WorkshopName}-registration-${AWS::AccountId}'
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      Tags:
+        - Key: Name
+          Value: !Sub '${WorkshopName}-registration-website'
+        - Key: Workshop
+          Value: !Ref WorkshopName
+        - Key: Purpose
+          Value: 'Student Registration'
+
+  # S3 Bucket Policy for Public Access
+  RegistrationWebsiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref RegistrationWebsiteBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: 's3:GetObject'
+            Resource: !Sub '${RegistrationWebsiteBucket}/*'
+
+  # Lambda Function for Account Creation
+  AccountCreationFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${WorkshopName}-account-creation'
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Role: !GetAtt AccountCreationRole.Arn
+      Timeout: 300
+      Environment:
+        Variables:
+          WORKSHOP_NAME: !Ref WorkshopName
+          MAX_STUDENTS: !Ref MaxStudents
+          BUDGET_LIMIT: !Ref BudgetLimit
+          EMAIL_DOMAIN: !Ref EmailDomain
+          WORKSHOP_OU_ID: !Ref WorkshopOUId
+          AWS_REGION: !Ref AWSRegion
+          NOTIFICATION_EMAIL: !Ref NotificationEmail
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import logging
+          
+          # Configure logging
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+          
+          # Initialize AWS clients
+          organizations = boto3.client('organizations')
+          ses = boto3.client('ses')
+          
+          def lambda_handler(event, context):
+              try:
+                  # Parse request
+                  body = json.loads(event['body'])
+                  email = body['email']
+                  name = body.get('name', email.split('@')[0])
+                  
+                  # Validate email format
+                  if '@' not in email or '.' not in email.split('@')[1]:
+                      return {
+                          'statusCode': 400,
+                          'body': json.dumps({'error': 'Invalid email format'})
+                      }
+                  
+                  # TODO: Add full account creation logic here
+                  # This is a placeholder - replace with full lambda-account-creation.py code
+                  
+                  return {
+                      'statusCode': 200,
+                      'body': json.dumps({
+                          'message': 'Account creation initiated',
+                          'email': email,
+                          'name': name,
+                          'workshop': event['environment']['variables']['WORKSHOP_NAME']
+                      })
+                  }
+                  
+              except Exception as e:
+                  logger.error(f"Error: {str(e)}")
+                  return {
+                      'statusCode': 500,
+                      'body': json.dumps({'error': 'Internal server error'})
+                  }
+      Tags:
+        - Key: Name
+          Value: !Sub '${WorkshopName}-account-creation'
+        - Key: Workshop
+          Value: !Ref WorkshopName
+
+  # IAM Role for Lambda Function
+  AccountCreationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: WorkshopAutomationPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - organizations:*
+                  - sso-admin:*
+                  - ses:SendEmail
+                  - ses:SendRawEmail
+                  - budgets:*
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource: '*'
+      Tags:
+        - Key: Name
+          Value: !Sub '${WorkshopName}-lambda-role'
+        - Key: Workshop
+          Value: !Ref WorkshopName
+
+  # API Gateway for Student Registration
+  RegistrationAPI:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub '${WorkshopName}-registration-api'
+      Description: 'API for student account registration'
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      Tags:
+        - Key: Name
+          Value: !Sub '${WorkshopName}-registration-api'
+        - Key: Workshop
+          Value: !Ref WorkshopName
+
+  # API Gateway Resource
+  RegistrationResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RegistrationAPI
+      ParentId: !GetAtt RegistrationAPI.RootResourceId
+      PathPart: register
+
+  # API Gateway Method
+  RegistrationMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RegistrationAPI
+      ResourceId: !Ref RegistrationResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AccountCreationFunction.Arn}/invocations'
+
+  # API Gateway Deployment
+  APIDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: RegistrationMethod
+    Properties:
+      RestApiId: !Ref RegistrationAPI
+      StageName: prod
+
+  # Lambda Permission for API Gateway
+  LambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AccountCreationFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RegistrationAPI}/*/*'
+
+  # CloudWatch Log Group
+  LambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AccountCreationFunction}'
+      RetentionInDays: 7
+      Tags:
+        - Key: Name
+          Value: !Sub '${WorkshopName}-lambda-logs'
+        - Key: Workshop
+          Value: !Ref WorkshopName
+
+  # S3 Bucket for Lambda Code Storage
+  LambdaCodeBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${WorkshopName}-lambda-code-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
+      Tags:
+        - Key: Name
+          Value: !Sub '${WorkshopName}-lambda-code'
+        - Key: Workshop
+          Value: !Ref WorkshopName
+
+  # CloudWatch Dashboard
+  WorkshopDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub '${WorkshopName}-automation-dashboard'
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  ["AWS/Lambda", "Invocations", "FunctionName", "${AccountCreationFunction}"],
+                  ["AWS/Lambda", "Errors", "FunctionName", "${AccountCreationFunction}"]
+                ],
+                "period": 300,
+                "stat": "Sum",
+                "region": "${AWS::Region}",
+                "title": "Lambda Function Metrics"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 6,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  ["AWS/ApiGateway", "Count", "ApiName", "${RegistrationAPI}"]
+                ],
+                "period": 300,
+                "stat": "Sum",
+                "region": "${AWS::Region}",
+                "title": "API Gateway Metrics"
+              }
+            }
+          ]
+        }
+
+Outputs:
+  RegistrationWebsiteURL:
+    Description: 'URL for student registration website'
+    Value: !Sub 'http://${RegistrationWebsiteBucket}.s3-website-${AWS::Region}.amazonaws.com'
+    Export:
+      Name: !Sub '${WorkshopName}-RegistrationWebsiteURL'
+
+  RegistrationAPIURL:
+    Description: 'API endpoint for account registration'
+    Value: !Sub 'https://${RegistrationAPI}.execute-api.${AWS::Region}.amazonaws.com/prod/register'
+    Export:
+      Name: !Sub '${WorkshopName}-RegistrationAPIURL'
+
+  LambdaFunctionName:
+    Description: 'Name of the Lambda function for account creation'
+    Value: !Ref AccountCreationFunction
+    Export:
+      Name: !Sub '${WorkshopName}-LambdaFunctionName'
+
+  LambdaCodeBucketName:
+    Description: 'S3 bucket for storing Lambda code'
+    Value: !Ref LambdaCodeBucket
+    Export:
+      Name: !Sub '${WorkshopName}-LambdaCodeBucket'
+
+  DashboardURL:
+    Description: 'CloudWatch Dashboard URL for monitoring'
+    Value: !Sub 'https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=${WorkshopDashboard}'
+    Export:
+      Name: !Sub '${WorkshopName}-DashboardURL'
+
+  WorkshopConfiguration:
+    Description: 'Workshop configuration summary'
+    Value: !Sub 'Workshop: ${WorkshopName}, Max Students: ${MaxStudents}, Budget: $${BudgetLimit}, Region: ${AWS::Region}'
+    Export:
+      Name: !Sub '${WorkshopName}-Configuration'
