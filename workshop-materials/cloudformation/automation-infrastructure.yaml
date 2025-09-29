@@ -90,7 +90,7 @@ Resources:
           - Effect: Allow
             Principal: '*'
             Action: 's3:GetObject'
-            Resource: !Sub '${RegistrationWebsiteBucket}/*'
+            Resource: !Sub '${RegistrationWebsiteBucket.Arn}/*'
 
   # Lambda Function for Account Creation
   AccountCreationFunction:
