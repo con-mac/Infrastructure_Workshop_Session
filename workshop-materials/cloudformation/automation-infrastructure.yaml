@@ -63,8 +63,7 @@ Resources:
   RegistrationWebsiteBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub
-        - !Sub '${WorkshopName}-registration-${AWS::AccountId}'
+      BucketName: !Sub '${WorkshopName}-registration-${AWS::AccountId}'
       WebsiteConfiguration:
         IndexDocument: index.html
         ErrorDocument: error.html
