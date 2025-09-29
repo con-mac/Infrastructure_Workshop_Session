@@ -108,7 +108,6 @@ Resources:
           BUDGET_LIMIT: !Ref BudgetLimit
           EMAIL_DOMAIN: !Ref EmailDomain
           WORKSHOP_OU_ID: !Ref WorkshopOUId
-          AWS_REGION: !Ref AWSRegion
           NOTIFICATION_EMAIL: !Ref NotificationEmail
       Code:
         ZipFile: |
