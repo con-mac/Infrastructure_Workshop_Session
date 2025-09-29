@@ -162,25 +162,20 @@ This step deploys the automation infrastructure that handles student account cre
 
 ### Step 3.1: Prepare Template File
 
-1. **Navigate to Your Repository**
-   ```bash
-   cd /path/to/your/Apprentice_Infra_Workshop
-   # or wherever you cloned the repository
-   ```
+**If you already have the repository locally:**
+```bash
+cd /home/con-mac/dev/projects/Apprentice_Infra_Workshop
+ls -la workshop-materials/cloudformation/automation-infrastructure.yaml
+```
 
-2. **Locate the Template File**
-   - The template is located at: `workshop-materials/cloudformation/automation-infrastructure.yaml`
-   - Verify the file exists:
-   ```bash
-   ls -la workshop-materials/cloudformation/automation-infrastructure.yaml
-   ```
+**If you need to clone the repository:**
+```bash
+git clone https://github.com/con-mac/Infrastructure_Workshop_Session.git
+cd Infrastructure_Workshop_Session
+ls -la workshop-materials/cloudformation/automation-infrastructure.yaml
+```
 
-3. **Download/Clone Repository (if needed)**
-   - If you don't have the repository locally, clone it:
-   ```bash
-   git clone https://github.com/con-mac/Infrastructure_Workshop_Session.git
-   cd Infrastructure_Workshop_Session
-   ```
+**The template file should be at:** `workshop-materials/cloudformation/automation-infrastructure.yaml`
 
 ### Step 3.2: Access CloudFormation Console
 
