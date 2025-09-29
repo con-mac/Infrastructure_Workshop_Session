@@ -4,10 +4,10 @@ Description: 'Workshop Student Account Creation Automation Infrastructure - Depl
 Parameters:
   WorkshopName:
     Type: String
-    Default: 'Infrastructure-Workshop-2024'
-    Description: 'Name of the workshop (used for resource naming)'
-    AllowedPattern: '^[a-zA-Z0-9-]+$'
-    ConstraintDescription: 'Must contain only alphanumeric characters and hyphens'
+    Default: 'infrastructure-workshop-2024'
+    Description: 'Name of the workshop (used for resource naming) - must be lowercase for S3 bucket names'
+    AllowedPattern: '^[a-z0-9-]+$'
+    ConstraintDescription: 'Must contain only lowercase alphanumeric characters and hyphens'
 
   MaxStudents:
     Type: Number
@@ -63,7 +63,8 @@ Resources:
   RegistrationWebsiteBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub '${WorkshopName}-registration-${AWS::AccountId}'
+      BucketName: !Sub
+        - !Sub '${WorkshopName}-registration-${AWS::AccountId}'
       WebsiteConfiguration:
         IndexDocument: index.html
         ErrorDocument: error.html
