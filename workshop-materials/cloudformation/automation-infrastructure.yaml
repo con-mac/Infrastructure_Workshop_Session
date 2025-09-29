@@ -28,9 +28,7 @@ Parameters:
   EmailDomain:
     Type: String
     Default: 'yourdomain.com'
-    Description: 'Your email domain for SES (must be verified in SES)'
-    AllowedPattern: '^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    ConstraintDescription: 'Must be a valid domain name (e.g., yourdomain.com)'
+    Description: 'Your email domain for SES (must be verified in SES) - can be any domain for testing'
 
   WorkshopOUId:
     Type: String
