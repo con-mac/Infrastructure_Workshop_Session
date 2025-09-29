@@ -66,7 +66,7 @@ Email → API Gateway → Lambda → Organizations → IAM Identity Center → E
    - Choose "All features" (consolidated billing, SCPs, etc.)
 
 2. **Configure Organization Settings**
-   - **Organization Name:** `Infrastructure-Workshop-2024`
+   - **Organization Name:** `Infrastructure-Workshop-2025`
    - **Root Email:** Your email address
    - **Enable All Features:** ✅
 
@@ -197,9 +197,9 @@ Fill in the following parameters (all have defaults but should be customized):
 #### **Required Parameters:**
 
 **Workshop Name:**
-- **Default:** `Infrastructure-Workshop-2024`
+- **Default:** `Infrastructure-Workshop-2025`
 - **Description:** Name used for all resource naming
-- **Your Value:** Keep default or customize (e.g., `My-Company-Workshop-2024`)
+- **Your Value:** Keep default or customize (e.g., `My-Company-Workshop-2025`)
 
 **Max Students:**
 - **Default:** `8`
@@ -286,7 +286,7 @@ Fill in the following parameters (all have defaults but should be customized):
 
 3. **Upload Website Files (Required)**
    - Go to AWS Console → Services → S3
-   - Find your bucket: `infrastructure-workshop-2024-registration-{account-id}`
+   - Find your bucket: `infrastructure-workshop-2025-registration-{account-id}`
    - Click "Upload" → "Add files"
    - Upload these files from your local repository:
      - `workshop-materials/automation/student-registration.html` → rename to `index.html`

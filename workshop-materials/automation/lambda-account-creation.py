@@ -20,7 +20,7 @@ budgets = boto3.client('budgets')
 cloudformation = boto3.client('cloudformation')
 
 # Configuration
-WORKSHOP_NAME = 'Infrastructure-Workshop-2024'
+WORKSHOP_NAME = 'Infrastructure-Workshop-2025'
 WORKSHOP_DURATION_DAYS = 7
 MAX_STUDENTS = 8
 BUDGET_LIMIT = 10.00

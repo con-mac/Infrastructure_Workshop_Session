@@ -4,7 +4,7 @@ Description: 'Workshop Student Account Creation Automation Infrastructure - Depl
 Parameters:
   WorkshopName:
     Type: String
-    Default: 'infrastructure-workshop-2024'
+    Default: 'infrastructure-workshop-2025'
     Description: 'Name of the workshop (used for resource naming) - must be lowercase for S3 bucket names'
     AllowedPattern: '^[a-z0-9-]+$'
     ConstraintDescription: 'Must contain only lowercase alphanumeric characters and hyphens'
