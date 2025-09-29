@@ -143,6 +143,13 @@ Create a policy to limit expensive services:
 
 ## Step 3: Deploy Automation Infrastructure
 
+### Quick Reference
+- **Template File:** `workshop-materials/cloudformation/automation-infrastructure.yaml`
+- **Repository:** `https://github.com/con-mac/Infrastructure_Workshop_Session.git`
+- **Prerequisites:** AWS Console access, repository cloned locally
+- **Time Required:** 15-20 minutes
+- **Cost:** $0.76/month
+
 ### Overview
 
 This step deploys the automation infrastructure that handles student account creation, registration website, and workshop management. The infrastructure includes:
@@ -153,7 +160,29 @@ This step deploys the automation infrastructure that handles student account cre
 - **IAM Roles:** Manages permissions for automation
 - **CloudWatch:** Monitors the automation system
 
-### Step 3.1: Access CloudFormation Console
+### Step 3.1: Prepare Template File
+
+1. **Navigate to Your Repository**
+   ```bash
+   cd /path/to/your/Apprentice_Infra_Workshop
+   # or wherever you cloned the repository
+   ```
+
+2. **Locate the Template File**
+   - The template is located at: `workshop-materials/cloudformation/automation-infrastructure.yaml`
+   - Verify the file exists:
+   ```bash
+   ls -la workshop-materials/cloudformation/automation-infrastructure.yaml
+   ```
+
+3. **Download/Clone Repository (if needed)**
+   - If you don't have the repository locally, clone it:
+   ```bash
+   git clone https://github.com/con-mac/Infrastructure_Workshop_Session.git
+   cd Infrastructure_Workshop_Session
+   ```
+
+### Step 3.2: Access CloudFormation Console
 
 1. **Navigate to CloudFormation**
    - Go to AWS Console → Services → CloudFormation
@@ -162,10 +191,11 @@ This step deploys the automation infrastructure that handles student account cre
 
 2. **Upload Template**
    - Click "Choose file"
-   - Select the `automation-infrastructure.yaml` file
+   - Navigate to your local repository folder
+   - Select: `workshop-materials/cloudformation/automation-infrastructure.yaml`
    - Click "Next"
 
-### Step 3.2: Configure Stack Parameters
+### Step 3.3: Configure Stack Parameters
 
 Fill in the following parameters (all have defaults but should be customized):
 
@@ -206,7 +236,7 @@ Fill in the following parameters (all have defaults but should be customized):
 - **Description:** Email for workshop notifications
 - **Your Value:** Your instructor email address
 
-### Step 3.3: Configure Stack Options
+### Step 3.4: Configure Stack Options
 
 1. **Stack Name**
    - Enter: `Workshop-Automation-Infrastructure`
@@ -226,7 +256,7 @@ Fill in the following parameters (all have defaults but should be customized):
    - Leave all defaults
    - No additional configuration needed
 
-### Step 3.4: Review and Deploy
+### Step 3.5: Review and Deploy
 
 1. **Review Configuration**
    - Check all parameters are correct
@@ -243,7 +273,7 @@ Fill in the following parameters (all have defaults but should be customized):
    - Wait for deployment (5-10 minutes)
    - Monitor the Events tab for progress
 
-### Step 3.5: Verify Deployment
+### Step 3.6: Verify Deployment
 
 1. **Check Stack Status**
    - Go to CloudFormation → Stacks
@@ -264,7 +294,7 @@ Fill in the following parameters (all have defaults but should be customized):
    - Should see the student registration page
    - Form should load (don't submit yet - need to configure email first)
 
-### Step 3.6: Update Lambda Function Code
+### Step 3.7: Update Lambda Function Code
 
 The deployed Lambda function contains placeholder code. You need to update it with the full account creation logic:
 
@@ -285,7 +315,7 @@ The deployed Lambda function contains placeholder code. You need to update it wi
    - Test the function with a sample event
    - Check CloudWatch logs for any errors
 
-### Step 3.7: Configure S3 Website
+### Step 3.8: Configure S3 Website
 
 1. **Upload Student Registration Website**
    - Go to S3 → Buckets
