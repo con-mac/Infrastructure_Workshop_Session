@@ -284,7 +284,16 @@ Fill in the following parameters (all have defaults but should be customized):
      - **LambdaFunctionName:** Lambda function name
      - **DashboardURL:** Monitoring dashboard
 
-3. **Test Basic Functionality**
+3. **Upload Website Files (Required)**
+   - Go to AWS Console → Services → S3
+   - Find your bucket: `infrastructure-workshop-2024-registration-{account-id}`
+   - Click "Upload" → "Add files"
+   - Upload these files from your local repository:
+     - `workshop-materials/automation/student-registration.html` → rename to `index.html`
+     - `workshop-materials/automation/instructor-dashboard.html` → upload as `instructor-dashboard.html`
+   - Select both files → "Actions" → "Make public"
+
+4. **Test Basic Functionality**
    - Click on the **RegistrationWebsiteURL**
    - Should see the student registration page
    - Form should load (don't submit yet - need to configure email first)
