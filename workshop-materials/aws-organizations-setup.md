@@ -376,468 +376,167 @@ This automation infrastructure will cost approximately **$0.76 per month**:
 
 ## Step 4: Configure Email (SES)
 
-```yaml
-AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Workshop Student Account Creation Automation'
+### Quick Reference
+- **Service:** Amazon Simple Email Service (SES)
+- **Purpose:** Send welcome emails to students with account details
+- **Time Required:** 10-15 minutes
+- **Cost:** $0.00 (within free tier)
 
-Parameters:
-  WorkshopName:
-    Type: String
-    Default: 'Infrastructure-Workshop-2024'
-    Description: Name of the workshop
-  
-  MaxStudents:
-    Type: Number
-    Default: 20
-    Description: Maximum number of student accounts
-  
-  WorkshopDuration:
-    Type: Number
-    Default: 7
-    Description: Workshop duration in days
+### Overview
 
-Resources:
-  # S3 Bucket for Static Website
-  RegistrationWebsiteBucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: !Sub '${WorkshopName}-registration-${AWS::AccountId}'
-      WebsiteConfiguration:
-        IndexDocument: index.html
-        ErrorDocument: error.html
-      PublicAccessBlockConfiguration:
-        BlockPublicAcls: false
-        BlockPublicPolicy: false
-        IgnorePublicAcls: false
-        RestrictPublicBuckets: false
+This step configures Amazon SES to send welcome emails to students when their AWS accounts are created. SES needs to be configured with verified email addresses or domains.
 
-  # S3 Bucket Policy for Public Access
-  RegistrationWebsiteBucketPolicy:
-    Type: AWS::S3::BucketPolicy
-    Properties:
-      Bucket: !Ref RegistrationWebsiteBucket
-      PolicyDocument:
-        Statement:
-          - Effect: Allow
-            Principal: '*'
-            Action: 's3:GetObject'
-            Resource: !Sub '${RegistrationWebsiteBucket}/*'
+### Step 4.1: Access SES Console
 
-  # Lambda Function for Account Creation
-  AccountCreationFunction:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: !Sub '${WorkshopName}-account-creation'
-      Runtime: python3.9
-      Handler: index.lambda_handler
-      Role: !GetAtt AccountCreationRole.Arn
-      Timeout: 300
-      Environment:
-        Variables:
-          ORGANIZATION_ID: !Ref 'AWS::Organization'
-          OU_ID: !Ref WorkshopOU
-          WORKSHOP_NAME: !Ref WorkshopName
-      Code:
-        ZipFile: |
-          import json
-          import boto3
-          import uuid
-          import time
-          from datetime import datetime, timedelta
-          
-          organizations = boto3.client('organizations')
-          iam_identity_center = boto3.client('sso-admin')
-          ses = boto3.client('ses')
-          
-          def lambda_handler(event, context):
-              try:
-                  # Parse request
-                  body = json.loads(event['body'])
-                  email = body['email']
-                  student_name = body.get('name', email.split('@')[0])
-                  
-                  # Validate email format
-                  if '@' not in email or '.' not in email.split('@')[1]:
-                      return {
-                          'statusCode': 400,
-                          'body': json.dumps({'error': 'Invalid email format'})
-                      }
-                  
-                  # Create AWS account
-                  account_name = f"{student_name}-workshop-account"
-                  account_email = email
-                  
-                  response = organizations.create_account(
-                      Email=account_email,
-                      AccountName=account_name,
-                      RoleName='OrganizationAccountAccessRole',
-                      IamUserAccessToBilling='ALLOW'
-                  )
-                  
-                  create_account_request_id = response['CreateAccountStatus']['Id']
-                  
-                  # Wait for account creation (simplified - in production, use Step Functions)
-                  time.sleep(30)
-                  
-                  # Get account ID
-                  account_status = organizations.describe_create_account_status(
-                      CreateAccountRequestId=create_account_request_id
-                  )
-                  
-                  if account_status['CreateAccountStatus']['State'] == 'SUCCEEDED':
-                      account_id = account_status['CreateAccountStatus']['AccountId']
-                      
-                      # Move account to Workshop OU
-                      organizations.move_account(
-                          AccountId=account_id,
-                          SourceParentId=organizations.list_roots()['Roots'][0]['Id'],
-                          DestinationParentId=event['environment']['variables']['OU_ID']
-                      )
-                      
-                      # Create IAM Identity Center user
-                      iam_identity_center.create_user(
-                          IdentityStoreId=get_identity_store_id(),
-                          UserName=email,
-                          DisplayName=student_name,
-                          Name={
-                              'Formatted': student_name,
-                              'FamilyName': student_name.split()[-1] if ' ' in student_name else student_name,
-                              'GivenName': student_name.split()[0]
-                          },
-                          Emails=[{'Value': email, 'Primary': True}]
-                      )
-                      
-                      # Generate temporary password
-                      temp_password = generate_temp_password()
-                      
-                      # Set up AWS Budget for account
-                      setup_account_budget(account_id, email)
-                      
-                      # Send welcome email
-                      send_welcome_email(email, student_name, account_id, temp_password)
-                      
-                      return {
-                          'statusCode': 200,
-                          'body': json.dumps({
-                              'message': 'Account created successfully',
-                              'account_id': account_id,
-                              'email_sent': True
-                          })
-                      }
-                  else:
-                      return {
-                          'statusCode': 500,
-                          'body': json.dumps({'error': 'Account creation failed'})
-                      }
-                      
-              except Exception as e:
-                  return {
-                      'statusCode': 500,
-                      'body': json.dumps({'error': str(e)})
-                  }
-          
-          def get_identity_store_id():
-              response = iam_identity_center.list_identity_stores()
-              return response['IdentityStores'][0]['IdentityStoreId']
-          
-          def generate_temp_password():
-              import secrets
-              import string
-              alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
-              password = ''.join(secrets.choice(alphabet) for i in range(12))
-              return password
-          
-          def setup_account_budget(account_id, email):
-              # This would require cross-account role assumption
-              # Simplified for this example
-              pass
-          
-          def send_welcome_email(email, name, account_id, temp_password):
-              subject = f"Welcome to {event['environment']['variables']['WORKSHOP_NAME']}!"
-              body = f"""
-              Hello {name},
-              
-              Your AWS workshop account has been created successfully!
-              
-              Account Details:
-              - Account ID: {account_id}
-              - Email: {email}
-              - Temporary Password: {temp_password}
-              
-              Access Instructions:
-              1. Go to: https://{account_id}.signin.aws.amazon.com/console
-              2. Use your email and temporary password to log in
-              3. You'll be prompted to set a new password
-              
-              Workshop Information:
-              - Date: [Workshop Date]
-              - Duration: [Workshop Duration]
-              - Cost Limit: $50 per account
-              
-              If you have any questions, contact your instructor.
-              
-              Best regards,
-              Workshop Team
-              """
-              
-              ses.send_email(
-                  Source='workshop@yourdomain.com',  # Must be verified in SES
-                  Destination={'ToAddresses': [email]},
-                  Message={
-                      'Subject': {'Data': subject},
-                      'Body': {'Text': {'Data': body}}
-                  }
-              )
+1. **Navigate to SES**
+   - Go to AWS Console → Services → Simple Email Service
+   - **Important:** Make sure you're in the **us-east-1** region (SES is only available in certain regions)
 
-  # IAM Role for Lambda Function
-  AccountCreationRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-      Policies:
-        - PolicyName: OrganizationsAccess
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - organizations:*
-                  - sso-admin:*
-                  - ses:SendEmail
-                  - budgets:*
-                Resource: '*'
+2. **Check Current Status**
+   - You should see the SES dashboard
+   - Note your current sending quota and bounce/complaint rates
 
-  # API Gateway for Student Registration
-  RegistrationAPI:
-    Type: AWS::ApiGateway::RestApi
-    Properties:
-      Name: !Sub '${WorkshopName}-registration-api'
-      Description: API for student account registration
-      EndpointConfiguration:
-        Types:
-          - REGIONAL
+### Step 4.2: Verify Email Address (Sandbox Mode)
 
-  # API Gateway Resource and Method
-  RegistrationResource:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref RegistrationAPI
-      ParentId: !GetAtt RegistrationAPI.RootResourceId
-      PathPart: register
+**Option A: Verify Individual Email Address (Recommended for Testing)**
 
-  RegistrationMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref RegistrationAPI
-      ResourceId: !Ref RegistrationResource
-      HttpMethod: POST
-      AuthorizationType: NONE
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AccountCreationFunction.Arn}/invocations'
+1. **Go to Verified Identities**
+   - Click "Verified identities" in the left sidebar
+   - Click "Create identity"
 
-  # API Gateway Deployment
-  APIDeployment:
-    Type: AWS::ApiGateway::Deployment
-    DependsOn: RegistrationMethod
-    Properties:
-      RestApiId: !Ref RegistrationAPI
-      StageName: prod
+2. **Configure Email Identity**
+   - **Identity type:** Email address
+   - **Email address:** Enter your email (e.g., `instructor@yourdomain.com`)
+   - **Use a default configuration set:** Leave unchecked
+   - Click "Create identity"
 
-  # Lambda Permission for API Gateway
-  LambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !Ref AccountCreationFunction
-      Action: lambda:InvokeFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RegistrationAPI}/*/*'
+3. **Verify Email**
+   - Check your email inbox
+   - Look for email from AWS SES
+   - Click the verification link
+   - Return to SES console and refresh
+   - Status should show "Verified"
 
-  # Workshop OU (will be created if it doesn't exist)
-  WorkshopOU:
-    Type: AWS::Organizations::OrganizationalUnit
-    Properties:
-      Name: Workshop-Students
-      ParentId: !Ref 'AWS::Organization'
+**Option B: Verify Domain (Production)**
 
-Outputs:
-  RegistrationWebsiteURL:
-    Description: URL for student registration website
-    Value: !Sub 'http://${RegistrationWebsiteBucket}.s3-website-${AWS::Region}.amazonaws.com'
-  
-  RegistrationAPIURL:
-    Description: API endpoint for account registration
-    Value: !Sub 'https://${RegistrationAPI}.execute-api.${AWS::Region}.amazonaws.com/prod/register'
-  
-  WorkshopOUId:
-    Description: Organizational Unit ID for student accounts
-    Value: !Ref WorkshopOU
-```
+1. **Go to Verified Identities**
+   - Click "Verified identities" in the left sidebar
+   - Click "Create identity"
 
----
+2. **Configure Domain Identity**
+   - **Identity type:** Domain
+   - **Domain:** Enter your domain (e.g., `yourdomain.com`)
+   - **Use a default configuration set:** Leave unchecked
+   - Click "Create identity"
 
-## Step 4: Create Student Registration Website
+3. **Add DNS Records**
+   - Copy the provided DNS records
+   - Add them to your domain's DNS settings
+   - Wait for verification (can take up to 72 hours)
 
-### HTML Registration Form
+### Step 4.3: Request Production Access (Optional)
 
-Create a simple registration form:
+**If you want to send emails to any address (not just verified ones):**
 
-```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AWS Workshop Registration</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 600px;
-            margin: 50px auto;
-            padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-        .container {
-            background: rgba(255,255,255,0.1);
-            padding: 30px;
-            border-radius: 15px;
-            backdrop-filter: blur(10px);
-        }
-        .form-group {
-            margin-bottom: 20px;
-        }
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-        input[type="email"], input[type="text"] {
-            width: 100%;
-            padding: 10px;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-        }
-        button {
-            background: #4CAF50;
-            color: white;
-            padding: 12px 24px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            width: 100%;
-        }
-        button:hover {
-            background: #45a049;
-        }
-        .success, .error {
-            padding: 15px;
-            border-radius: 5px;
-            margin: 20px 0;
-            display: none;
-        }
-        .success {
-            background: rgba(76, 175, 80, 0.3);
-            border: 1px solid #4CAF50;
-        }
-        .error {
-            background: rgba(244, 67, 54, 0.3);
-            border: 1px solid #f44336;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🚀 AWS Infrastructure Workshop</h1>
-        <h2>Student Account Registration</h2>
-        
-        <div class="success" id="successMessage">
-            ✅ Account created successfully! Check your email for access details.
-        </div>
-        
-        <div class="error" id="errorMessage">
-            ❌ Registration failed. Please try again or contact support.
-        </div>
-        
-        <form id="registrationForm">
-            <div class="form-group">
-                <label for="email">University Email Address:</label>
-                <input type="email" id="email" name="email" required 
-                       placeholder="your.name@university.edu">
-            </div>
-            
-            <div class="form-group">
-                <label for="name">Full Name:</label>
-                <input type="text" id="name" name="name" required 
-                       placeholder="John Smith">
-            </div>
-            
-            <button type="submit">Create My AWS Account</button>
-        </form>
-        
-        <div style="margin-top: 30px; font-size: 14px; opacity: 0.8;">
-            <h3>What happens next?</h3>
-            <ol>
-                <li>We'll create a dedicated AWS account for you</li>
-                <li>You'll receive an email with login details</li>
-                <li>Your account will have a $50 spending limit</li>
-                <li>All resources will be automatically cleaned up after the workshop</li>
-            </ol>
-        </div>
-    </div>
+1. **Go to Account Dashboard**
+   - Click "Account dashboard" in the left sidebar
+   - Look for "Sending statistics"
 
-    <script>
-        document.getElementById('registrationForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const email = document.getElementById('email').value;
-            const name = document.getElementById('name').value;
-            
-            try {
-                const response = await fetch('YOUR_API_GATEWAY_URL/register', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        email: email,
-                        name: name
-                    })
-                });
-                
-                const result = await response.json();
-                
-                if (response.ok) {
-                    document.getElementById('successMessage').style.display = 'block';
-                    document.getElementById('errorMessage').style.display = 'none';
-                    document.getElementById('registrationForm').reset();
-                } else {
-                    throw new Error(result.error || 'Registration failed');
-                }
-            } catch (error) {
-                document.getElementById('errorMessage').style.display = 'block';
-                document.getElementById('successMessage').style.display = 'none';
-                console.error('Registration error:', error);
-            }
-        });
-    </script>
-</body>
-</html>
-```
+2. **Request Production Access**
+   - Click "Request production access"
+   - Fill out the form:
+     - **Mail type:** Transactional
+     - **Website URL:** Your workshop website URL
+     - **Use case description:** "Sending welcome emails for AWS workshop student accounts"
+     - **Expected daily sending volume:** 10-50 emails
+   - Submit the request
 
----
+3. **Wait for Approval**
+   - Usually takes 24-48 hours
+   - You'll receive an email when approved
 
+### Step 4.4: Update Lambda Function Email Settings
+
+1. **Get Your Verified Email**
+   - Note your verified email address from Step 4.2
+   - Example: `instructor@yourdomain.com`
+
+2. **Update Lambda Function**
+   - Go to Lambda → Functions
+   - Find: `infrastructure-workshop-2025-account-creation`
+   - Click on the function name
+   - Go to "Code" tab
+   - Find line 334: `Source='workshop@yourdomain.com'`
+   - Replace with your verified email: `Source='instructor@yourdomain.com'`
+   - Click "Deploy"
+
+### Step 4.5: Test Email Functionality
+
+1. **Test with Lambda Function**
+   - Go to Lambda → Test
+   - Use this test event:
+   ```json
+   {
+     "email": "your-email@yourdomain.com",
+     "name": "Test User"
+   }
+   ```
+
+2. **Check Email Delivery**
+   - Check your email inbox
+   - You should receive a welcome email
+   - If not, check CloudWatch logs for errors
+
+### Step 4.6: Configure Email Templates (Optional)
+
+1. **Customize Welcome Email**
+   - The Lambda function includes HTML email templates
+   - You can modify the email content in the Lambda code
+   - Look for `create_welcome_email_html()` function
+
+2. **Add Your Branding**
+   - Update the email template with your company branding
+   - Modify colors, logos, and content as needed
+
+### Troubleshooting Email Issues
+
+#### **Email Not Sending**
+- **Check verified identity:** Ensure your email/domain is verified
+- **Check region:** SES is only available in certain regions (us-east-1, us-west-2, eu-west-1)
+- **Check CloudWatch logs:** Look for specific error messages
+- **Check sending quota:** Ensure you haven't exceeded limits
+
+#### **Email Going to Spam**
+- **Use verified domain:** Domain verification is better than email verification
+- **Set up SPF/DKIM records:** Add proper DNS records for your domain
+- **Test with different email providers:** Gmail, Outlook, etc.
+
+#### **SES Sandbox Limitations**
+- **Sandbox mode:** Can only send to verified email addresses
+- **Request production access:** To send to any email address
+- **Daily sending limit:** 200 emails per day in sandbox mode
+
+### Step 4.7: Verify Email Configuration
+
+1. **Test Registration Flow**
+   - Go to your student registration website
+   - Fill out the registration form
+   - Submit the form
+   - Check if you receive the welcome email
+
+2. **Check Email Content**
+   - Verify the email contains correct information
+   - Check that links work properly
+   - Ensure branding looks correct
+
+### Next Steps
+
+Once email is configured:
+- **Step 5:** Test the complete registration flow
+- **Step 6:** Set up monitoring and alerts
+- **Step 7:** Prepare for the workshop
+
+**Email configuration is now complete!** 📧✅
 ## Step 5: Configure Email Notifications
 
 ### Amazon SES Setup
