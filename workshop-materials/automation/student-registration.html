@@ -280,7 +280,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🚀 AWS Infrastructure Workshop</h1>
+            <h1>🚀 PA Consulting Infrastructure Workshop</h1>
             <h2>Student Account Registration</h2>
         </div>
         
@@ -291,7 +291,7 @@
                 <li>Challenge-based learning approach</li>
                 <li>Real-world troubleshooting scenarios</li>
                 <li>Individual AWS accounts for each student</li>
-                <li>Cost-optimized infrastructure ($1.84 total)</li>
+                <li>Cost-optimized infrastructure </li>
                 <li>Automated setup and cleanup</li>
             </ul>
         </div>
@@ -311,9 +311,9 @@
         <div class="form-container">
             <form id="registrationForm">
                 <div class="form-group">
-                    <label for="email">University Email Address *</label>
+                    <label for="email">PA Consulting Email Address *</label>
                     <input type="email" id="email" name="email" required 
-                           placeholder="your.name@university.edu"
+                           placeholder="your.name@paconsulting.com"
                            pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$">
                 </div>
                 
@@ -325,12 +325,6 @@
                            maxlength="50">
                 </div>
                 
-                <div class="form-group">
-                    <label for="studentId">Student ID (Optional)</label>
-                    <input type="text" id="studentId" name="studentId" 
-                           placeholder="12345678"
-                           maxlength="20">
-                </div>
                 
                 <button type="submit" class="btn" id="submitBtn">
                     Create My AWS Account
@@ -388,7 +382,6 @@
             
             const email = document.getElementById('email').value.trim();
             const name = document.getElementById('name').value.trim();
-            const studentId = document.getElementById('studentId').value.trim();
             
             // Validate inputs
             if (!email || !name) {
@@ -413,8 +406,7 @@
                     },
                     body: JSON.stringify({
                         email: email,
-                        name: name,
-                        studentId: studentId || null
+                        name: name
                     })
                 });
                 
