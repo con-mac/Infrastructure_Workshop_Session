@@ -1426,9 +1426,29 @@ echo "Open this URL in your browser: http://$WORKSHOP_BUCKET.s3-website-us-east-
 
 ### Step 7.3: Instructor Dashboard Setup
 
-#### 7.3.1: Create Real-Time Monitoring Dashboard
+#### 7.3.1: Deploy Instructor Dashboard
 
-**Step 1: Create Instructor Dashboard Backend API**
+**Step 1: Upload Dashboard Files to S3**
+
+1. **Go to S3 Console**
+   - Navigate to AWS Console → Services → S3
+   - Find your workshop bucket (e.g., `workshop-registration-2025-XXXXX`)
+   - Click on the bucket name
+
+2. **Upload Instructor Dashboard Files**
+   - Click "Upload"
+   - Click "Add files"
+   - Navigate to your local `workshop-materials/automation/` folder
+   - Select `instructor-dashboard.html`
+   - Click "Upload"
+
+3. **Set Correct Content Type**
+   - After upload, click on `instructor-dashboard.html`
+   - Go to "Properties" tab
+   - Scroll down to "Metadata"
+   - Click "Edit"
+   - Set "Content-Type" to `text/html`
+   - Click "Save changes"
 
 ```bash
 # Create Lambda function for instructor dashboard
