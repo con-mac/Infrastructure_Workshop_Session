@@ -440,7 +440,7 @@
 
     <script>
         // Configuration - Replace with your actual API endpoints
-        const API_BASE_URL = 'YOUR_API_GATEWAY_URL_HERE';
+        const API_BASE_URL = 'https://ful5pvttbl.execute-api.us-east-1.amazonaws.com/prod';
         const WORKSHOP_NAME = 'Infrastructure-Workshop-2025';
         const MAX_STUDENTS = 8;
         const BUDGET_LIMIT = 10.00;
@@ -469,11 +469,12 @@
                 showLoading(true);
                 
                 // Fetch student data
-                const response = await fetch(`${API_BASE_URL}/students`);
+                const response = await fetch(`${API_BASE_URL}/dashboard`);
                 const data = await response.json();
                 
                 if (response.ok) {
-                    studentsData = data.students || [];
+                    // Parse the workshop data from our API
+                    studentsData = data.accounts || [];
                     updateDashboard(studentsData);
                 } else {
                     throw new Error(data.error || 'Failed to fetch student data');
