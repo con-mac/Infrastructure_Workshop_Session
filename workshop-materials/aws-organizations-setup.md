@@ -1125,27 +1125,26 @@ Step 7 covers the complete workshop management lifecycle, from pre-workshop prep
    - Should show "Enabled" with `index.html` as the index document
    - Note the "Bucket website endpoint" URL for later use
 
-**Step 3: Update Registration Page API Endpoint**
+**Step 3: Update Registration Page in S3**
 
-The registration page is already uploaded as `index.html`, but it needs to be updated with your actual API Gateway endpoint:
+The local `student-registration.html` file already has the correct API endpoint. We need to upload it to S3:
 
-1. **Download Current Registration Page**
-   - Go to S3 Console
+1. **Go to S3 Console**
+   - Navigate to AWS Console → Services → S3
    - Find your bucket: `infrastructure-workshop-2025-registration-{account-id}`
-   - Click on `index.html`
-   - Click "Download"
+   - Click on the bucket name
 
-2. **Update API Endpoint**
-   - Open the downloaded file in a text editor
-   - Find the fetch URL (should be around line 1222)
-   - Replace `YOUR-API-GATEWAY-ENDPOINT` with your actual API Gateway URL from Step 7.1.1
-   - Save the file
-
-3. **Re-upload Updated File**
-   - Go back to S3 Console
+2. **Upload Updated Registration Page**
    - Click "Upload"
-   - Select the updated `index.html` file
-   - Click "Upload" (this will overwrite the existing file)
+   - Click "Add files"
+   - Navigate to your local `workshop-materials/automation/` folder
+   - Select `student-registration.html`
+   - **Important:** In the "Destination" section, change the key to `index.html`
+   - Click "Upload"
+
+3. **Verify Upload**
+   - You should now see `index.html` in your bucket
+   - This will be your student registration page
 
 **Step 4: Test Registration Flow**
 
@@ -1193,34 +1192,37 @@ The registration page is already uploaded as `index.html`, but it needs to be up
 
 #### 7.2.1: Registration Process
 
-1. **Student Registration Flow**
-   - Students visit registration page
-   - Fill out form with email, name, and optional student ID
-   - System creates AWS account automatically
-   - Welcome email sent with account details
+**Step 1: Test Student Registration Flow**
 
-2. **Registration Monitoring**
-   ```python
-   def monitor_registrations():
-       """Monitor student registrations in real-time"""
-       organizations = boto3.client('organizations')
-       
-       # Get workshop OU ID
-       workshop_ou_id = os.environ.get('WORKSHOP_OU_ID')
-       
-       # Get all accounts
-       accounts = organizations.list_accounts_for_parent(
-           ParentId=workshop_ou_id
-       )
-       
-       # Process each account
-       for account in accounts['Accounts']:
-           print(f"Account: {account['Name']}")
-           print(f"Email: {account['Email']}")
-           print(f"Status: {account['Status']}")
-           print(f"Created: {account['JoinedTimestamp']}")
-           print("---")
-   ```
+1. **Go to Your Registration Page**
+   - Open your browser
+   - Go to your S3 website URL (from Step 7.1.2)
+   - You should see the registration form
+
+2. **Test Registration**
+   - Fill out the form with a test email
+   - Click "Register for Workshop"
+   - Check that you get a success message
+   - Check your email for the welcome message
+
+3. **Verify Account Creation**
+   - Go to AWS Console → Services → Organizations
+   - Click "AWS accounts"
+   - Look for the new account with your test email
+   - Status should be "Active" or "Pending"
+
+**Step 2: Monitor Registrations (Optional)**
+
+If you want to monitor registrations, you can use the existing `cost-monitoring.py` script:
+
+1. **Go to Your Local Directory**
+   - Navigate to `workshop-materials/automation/`
+   - Open `cost-monitoring.py`
+
+2. **Run the Script**
+   - This will show you all workshop accounts
+   - Includes registration details and costs
+   - No need to create new files
 
 #### 7.2.2: Student Onboarding
 
@@ -1872,20 +1874,20 @@ curl -I http://$WORKSHOP_BUCKET.s3-website-us-east-1.amazonaws.com/instructor-da
 #### 7.6.2: Automated Cleanup Process
 
 1. **Create Cleanup Script**
-   ```python
-   def cleanup_workshop_accounts():
+```python
+def cleanup_workshop_accounts():
        """Clean up all workshop accounts after completion"""
-       organizations = boto3.client('organizations')
+    organizations = boto3.client('organizations')
        sso_admin = boto3.client('sso-admin')
-       
+    
        workshop_ou_id = os.environ.get('WORKSHOP_OU_ID')
-       accounts = organizations.list_accounts_for_parent(
-           ParentId=workshop_ou_id
-       )
+    accounts = organizations.list_accounts_for_parent(
+        ParentId=workshop_ou_id
+    )
        
        cleanup_log = []
-       
-       for account in accounts['Accounts']:
+    
+    for account in accounts['Accounts']:
            account_id = account['Id']
            account_name = account['Name']
            account_email = account['Email']
