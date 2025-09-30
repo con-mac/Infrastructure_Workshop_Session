@@ -656,82 +656,71 @@ Your Lambda function already includes basic cost management:
    aws ce get-cost-allocation-tags
    ```
 
-### Step 6.3: Create CloudWatch Cost Dashboard
+### Step 6.3: Create Cost Monitoring Dashboard
 
-#### 6.3.1: Create Instructor Dashboard
+**Note:** CloudWatch dashboards don't have billing metrics available. Use AWS Cost Explorer and Budgets for cost monitoring instead.
+
+#### 6.3.1: Create AWS Cost Explorer Dashboard (Recommended)
+
+1. **Go to AWS Cost Explorer**
+   - Navigate to **AWS Cost Management** → **Cost Explorer**
+   - Click **"Launch Cost Explorer"**
+
+2. **Create Cost Dashboard**
+   - Click **"Create dashboard"**
+   - Name: `Workshop-Cost-Monitoring-2025`
+
+3. **Add Cost Views**
+   - **Total Costs**: Shows overall workshop spending
+   - **Costs by Account**: Shows individual student account costs
+   - **Costs by Service**: Shows which AWS services are being used
+
+#### 6.3.2: Create AWS Budgets Dashboard
+
+1. **Go to AWS Budgets**
+   - Navigate to **AWS Cost Management** → **Budgets**
+   - Click **"Create budget"**
+
+2. **Create Master Workshop Budget**
+   ```
+   Budget name: Workshop-Master-Budget-2025
+   Budget type: Cost
+   Budget period: Monthly
+   Budget amount: £200.00
+   ```
+
+3. **Set Up Notifications**
+   ```
+   Alert threshold: 50% (£100)
+   Alert threshold: 80% (£160)
+   Alert threshold: 100% (£200)
+   Email recipients: your-email@yourdomain.com
+   ```
+
+#### 6.3.3: Create CloudWatch Infrastructure Dashboard (Optional)
 
 1. **Go to CloudWatch Console**
-   - Navigate to CloudWatch → Dashboards
-   - Click "Create dashboard"
+   - Navigate to CloudWatch → **Dashboards**
+   - Click **"Create dashboard"**
 
 2. **Dashboard Configuration**
    ```
-   Dashboard name: Workshop-Cost-Monitoring-2025
+   Dashboard name: Workshop-Infrastructure-Monitoring-2025
    ```
 
-3. **Add Cost Widgets**
+3. **Add Available Metrics**
+   - **EC2 Metrics**: CPU, Memory, Network
+   - **RDS Metrics**: Database connections, CPU
+   - **S3 Metrics**: Storage, requests
+   - **Lambda Metrics**: Invocations, errors
 
-   **Widget 1: Total Workshop Costs**
-   ```json
-   {
-     "type": "metric",
-     "x": 0,
-     "y": 0,
-     "width": 12,
-     "height": 6,
-     "properties": {
-       "metrics": [
-         ["AWS/Billing", "EstimatedCharges", "Currency", "USD"]
-       ],
-       "period": 86400,
-       "stat": "Maximum",
-       "region": "us-east-1",
-       "title": "Total Workshop Costs"
-     }
-   }
+4. **Example Widget Configuration**
    ```
-
-   **Widget 2: Costs by Student Account**
-   ```json
-   {
-     "type": "metric",
-     "x": 0,
-     "y": 6,
-     "width": 12,
-     "height": 6,
-     "properties": {
-       "metrics": [
-         ["AWS/Billing", "EstimatedCharges", "Currency", "USD", "AccountId", "123456789012"],
-         ["AWS/Billing", "EstimatedCharges", "Currency", "USD", "AccountId", "123456789013"]
-       ],
-       "period": 86400,
-       "stat": "Maximum",
-       "region": "us-east-1",
-       "title": "Costs by Student Account"
-     }
-   }
-   ```
-
-#### 6.3.2: Create Student-Level Dashboard
-
-1. **Create Student Dashboard Template**
-   ```json
-   {
-     "type": "metric",
-     "x": 0,
-     "y": 0,
-     "width": 12,
-     "height": 6,
-     "properties": {
-       "metrics": [
-         ["AWS/Billing", "EstimatedCharges", "Currency", "USD"]
-       ],
-       "period": 86400,
-       "stat": "Maximum",
-       "region": "us-east-1",
-       "title": "Your Account Costs"
-     }
-   }
+   Namespace: AWS/EC2
+   Metric: CPUUtilization
+   Instance: [Select your instances]
+   Period: 5 minutes
+   Statistic: Average
    ```
 
 ### Step 6.4: Set Up Cost Alerts and Notifications
