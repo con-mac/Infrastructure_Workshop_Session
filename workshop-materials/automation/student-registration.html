@@ -42,7 +42,7 @@
             };
             
             try {
-                const response = await fetch('YOUR-API-GATEWAY-ENDPOINT', {
+                const response = await fetch('https://5ag5k2p4aa.execute-api.us-east-1.amazonaws.com/prod/register', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(formData)
