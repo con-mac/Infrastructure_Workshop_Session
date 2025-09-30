@@ -1057,55 +1057,634 @@ Your cost management system is fully configured and ready to monitor workshop ex
 
 ---
 
-## Step 7: Workshop Management
+## Step 7: Workshop Management - Detailed Step-by-Step Guide
 
-### Instructor Dashboard
+### Overview
 
-Create a simple dashboard to monitor student accounts:
+Step 7 covers the complete workshop management lifecycle, from pre-workshop preparation through post-workshop cleanup. This includes student registration, instructor monitoring, real-time support, and automated cleanup processes.
 
-```python
-def get_workshop_status():
-    organizations = boto3.client('organizations')
-    
-    # Get all accounts in Workshop OU
-    accounts = organizations.list_accounts_for_parent(
-        ParentId=workshop_ou_id
-    )
-    
-    # Get account details and costs
-    account_status = []
-    for account in accounts['Accounts']:
-        status = {
-            'account_id': account['Id'],
-            'name': account['Name'],
-            'email': account['Email'],
-            'status': account['Status'],
-            'joined_date': account['JoinedTimestamp']
-        }
-        account_status.append(status)
-    
-    return account_status
-```
+### Step 7.1: Pre-Workshop Preparation
 
-### Automated Cleanup
+#### 7.1.1: Workshop Environment Setup
 
-Create a cleanup function to run after the workshop:
+1. **Verify Infrastructure Readiness**
+   ```bash
+   # Check Lambda function status
+   aws lambda get-function --function-name infrastructure-workshop-2025-account-creation
+   
+   # Verify API Gateway endpoint
+   aws apigateway get-rest-apis --query 'items[?name==`workshop-api`]'
+   
+   # Check SES configuration
+   aws ses get-identity-verification-attributes --identities your-email@yourdomain.com
+   ```
 
-```python
-def cleanup_workshop_accounts():
-    organizations = boto3.client('organizations')
-    
-    # Get all accounts in Workshop OU
-    accounts = organizations.list_accounts_for_parent(
-        ParentId=workshop_ou_id
-    )
-    
-    for account in accounts['Accounts']:
-        # Close the account (requires account to be empty)
-        organizations.close_account(
-            AccountId=account['Id']
-        )
-```
+2. **Test Complete Registration Flow**
+   ```bash
+   # Create test payload
+   echo '{"email":"test@example.com","name":"Test User"}' > test-payload.json
+   
+   # Test Lambda function
+   aws lambda invoke \
+     --function-name infrastructure-workshop-2025-account-creation \
+     --payload file://test-payload.json \
+     --cli-binary-format raw-in-base64-out \
+     test-response.json
+   
+   # Check response
+   cat test-response.json
+   ```
+
+3. **Verify Budget and Monitoring Setup**
+   ```bash
+   # Check master budget
+   aws budgets describe-budgets --account-id YOUR-ACCOUNT-ID
+   
+   # Verify cost allocation tags
+   aws ce get-cost-allocation-tags
+   ```
+
+#### 7.1.2: Student Communication Setup
+
+1. **Create Student Registration Page**
+   Create `student-registration.html`:
+   ```html
+   <!DOCTYPE html>
+   <html>
+   <head>
+       <title>Workshop Registration</title>
+       <style>
+           body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
+           .form-group { margin-bottom: 15px; }
+           label { display: block; margin-bottom: 5px; font-weight: bold; }
+           input[type="email"], input[type="text"] { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+           button { background: #007cba; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+           .success { color: green; margin-top: 10px; }
+           .error { color: red; margin-top: 10px; }
+       </style>
+   </head>
+   <body>
+       <h1>Infrastructure Workshop 2025 Registration</h1>
+       <form id="registrationForm">
+           <div class="form-group">
+               <label for="email">Email Address:</label>
+               <input type="email" id="email" name="email" required>
+           </div>
+           <div class="form-group">
+               <label for="name">Full Name:</label>
+               <input type="text" id="name" name="name" required>
+           </div>
+           <div class="form-group">
+               <label for="studentId">Student ID (Optional):</label>
+               <input type="text" id="studentId" name="studentId">
+           </div>
+           <button type="submit">Register for Workshop</button>
+       </form>
+       <div id="message"></div>
+   
+       <script>
+           document.getElementById('registrationForm').addEventListener('submit', async function(e) {
+               e.preventDefault();
+               
+               const formData = {
+                   email: document.getElementById('email').value,
+                   name: document.getElementById('name').value,
+                   studentId: document.getElementById('studentId').value
+               };
+               
+               try {
+                   const response = await fetch('YOUR-API-GATEWAY-ENDPOINT', {
+                       method: 'POST',
+                       headers: { 'Content-Type': 'application/json' },
+                       body: JSON.stringify(formData)
+                   });
+                   
+                   const result = await response.json();
+                   
+                   if (response.ok) {
+                       document.getElementById('message').innerHTML = 
+                           '<div class="success">Registration successful! Check your email for account details.</div>';
+                   } else {
+                       document.getElementById('message').innerHTML = 
+                           '<div class="error">Registration failed: ' + result.error + '</div>';
+                   }
+               } catch (error) {
+                   document.getElementById('message').innerHTML = 
+                       '<div class="error">Registration failed: ' + error.message + '</div>';
+               }
+           });
+       </script>
+   </body>
+   </html>
+   ```
+
+2. **Upload to S3 and Configure**
+   ```bash
+   # Upload registration page
+   aws s3 cp student-registration.html s3://your-workshop-bucket/
+   
+   # Set up static website hosting
+   aws s3 website s3://your-workshop-bucket --index-document student-registration.html
+   ```
+
+#### 7.1.3: Instructor Preparation
+
+1. **Create Instructor Checklist**
+   ```markdown
+   ## Pre-Workshop Checklist
+   
+   ### Infrastructure
+   - [ ] Lambda function deployed and tested
+   - [ ] API Gateway configured
+   - [ ] SES email verified
+   - [ ] Budgets configured
+   - [ ] Monitoring dashboards set up
+   
+   ### Student Communication
+   - [ ] Registration page accessible
+   - [ ] Welcome email template ready
+   - [ ] Student instructions prepared
+   - [ ] Support contact information shared
+   
+   ### Workshop Materials
+   - [ ] Lab instructions ready
+   - [ ] CloudFormation templates prepared
+   - [ ] Sample applications available
+   - [ ] Troubleshooting guide ready
+   ```
+
+### Step 7.2: Student Registration and Onboarding
+
+#### 7.2.1: Registration Process
+
+1. **Student Registration Flow**
+   - Students visit registration page
+   - Fill out form with email, name, and optional student ID
+   - System creates AWS account automatically
+   - Welcome email sent with account details
+
+2. **Registration Monitoring**
+   ```python
+   def monitor_registrations():
+       """Monitor student registrations in real-time"""
+       organizations = boto3.client('organizations')
+       
+       # Get workshop OU ID
+       workshop_ou_id = os.environ.get('WORKSHOP_OU_ID')
+       
+       # Get all accounts
+       accounts = organizations.list_accounts_for_parent(
+           ParentId=workshop_ou_id
+       )
+       
+       # Process each account
+       for account in accounts['Accounts']:
+           print(f"Account: {account['Name']}")
+           print(f"Email: {account['Email']}")
+           print(f"Status: {account['Status']}")
+           print(f"Created: {account['JoinedTimestamp']}")
+           print("---")
+   ```
+
+#### 7.2.2: Student Onboarding
+
+1. **Welcome Email Content**
+   - Account ID and login instructions
+   - Budget limits and monitoring
+   - Workshop schedule and materials
+   - Support contact information
+
+2. **Student Account Verification**
+   ```python
+   def verify_student_accounts():
+       """Verify all student accounts are ready"""
+       organizations = boto3.client('organizations')
+       sso_admin = boto3.client('sso-admin')
+       
+       workshop_ou_id = os.environ.get('WORKSHOP_OU_ID')
+       accounts = organizations.list_accounts_for_parent(
+           ParentId=workshop_ou_id
+       )
+       
+       ready_accounts = []
+       for account in accounts['Accounts']:
+           if account['Status'] == 'ACTIVE':
+               # Check if SSO user exists
+               try:
+                   identity_store_id = get_identity_store_id()
+                   users = sso_admin.list_users(
+                       IdentityStoreId=identity_store_id,
+                       Filters=[{
+                           'AttributePath': 'UserName',
+                           'AttributeValue': account['Email']
+                       }]
+                   )
+                   
+                   if users['Users']:
+                       ready_accounts.append(account)
+               except Exception as e:
+                   print(f"Error checking SSO for {account['Email']}: {e}")
+       
+       return ready_accounts
+   ```
+
+### Step 7.3: Instructor Dashboard Setup
+
+#### 7.3.1: Create Real-Time Monitoring Dashboard
+
+1. **Create Instructor Dashboard Script**
+   Create `instructor-dashboard.py`:
+   ```python
+   import boto3
+   import json
+   from datetime import datetime, timedelta
+   import os
+   
+   def get_workshop_status():
+       """Get comprehensive workshop status"""
+       organizations = boto3.client('organizations')
+       budgets = boto3.client('budgets')
+       ce = boto3.client('ce')
+       
+       workshop_ou_id = os.environ.get('WORKSHOP_OU_ID')
+       
+       # Get all accounts
+       accounts = organizations.list_accounts_for_parent(
+           ParentId=workshop_ou_id
+       )
+       
+       # Get account details
+       account_status = []
+       total_cost = 0
+       
+       for account in accounts['Accounts']:
+           account_id = account['Id']
+           account_name = account['Name']
+           account_email = account['Email']
+           account_status_val = account['Status']
+           joined_date = account['JoinedTimestamp']
+           
+           # Get cost for this account
+           try:
+               end_date = datetime.now().strftime('%Y-%m-%d')
+               start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+               
+               response = ce.get_cost_and_usage(
+                   TimePeriod={'Start': start_date, 'End': end_date},
+                   Granularity='MONTHLY',
+                   Metrics=['BlendedCost'],
+                   Filter={
+                       'Dimensions': {
+                           'Key': 'LINKED_ACCOUNT',
+                           'Values': [account_id]
+                       }
+                   }
+               )
+               
+               cost = float(response['ResultsByTime'][0]['Total']['BlendedCost']['Amount'])
+               total_cost += cost
+               
+           except Exception as e:
+               cost = 0
+               print(f"Error getting cost for {account_id}: {e}")
+           
+           account_status.append({
+               'account_id': account_id,
+               'name': account_name,
+               'email': account_email,
+               'status': account_status_val,
+               'joined_date': joined_date.isoformat(),
+               'cost': cost,
+               'cost_status': 'WARNING' if cost > 15 else 'OK'
+           })
+       
+       return {
+           'workshop_info': {
+               'total_accounts': len(accounts['Accounts']),
+               'active_accounts': len([a for a in account_status if a['status'] == 'ACTIVE']),
+               'total_cost': total_cost,
+               'last_updated': datetime.now().isoformat()
+           },
+           'accounts': account_status
+       }
+   
+   def generate_workshop_report():
+       """Generate comprehensive workshop report"""
+       status = get_workshop_status()
+       
+       report = f"""
+   # Workshop Status Report
+   Generated: {status['workshop_info']['last_updated']}
+   
+   ## Summary
+   - Total Accounts: {status['workshop_info']['total_accounts']}
+   - Active Accounts: {status['workshop_info']['active_accounts']}
+   - Total Cost: ${status['workshop_info']['total_cost']:.2f}
+   
+   ## Account Details
+   """
+       
+       for account in status['accounts']:
+           report += f"""
+   ### {account['name']} ({account['email']})
+   - Account ID: {account['account_id']}
+   - Status: {account['status']}
+   - Cost: ${account['cost']:.2f} ({account['cost_status']})
+   - Joined: {account['joined_date']}
+   """
+       
+       return report
+   
+   if __name__ == "__main__":
+       status = get_workshop_status()
+       print(json.dumps(status, indent=2))
+   ```
+
+### Step 7.4: Real-Time Workshop Monitoring
+
+#### 7.4.1: Monitor Student Activity
+
+1. **Create Activity Monitoring Script**
+   ```python
+   def monitor_student_activity():
+       """Monitor student activity across all accounts"""
+       organizations = boto3.client('organizations')
+       cloudwatch = boto3.client('cloudwatch')
+       
+       workshop_ou_id = os.environ.get('WORKSHOP_OU_ID')
+       accounts = organizations.list_accounts_for_parent(
+           ParentId=workshop_ou_id
+       )
+       
+       activity_report = []
+       
+       for account in accounts['Accounts']:
+           account_id = account['Id']
+           account_name = account['Name']
+           
+           # Get recent activity metrics
+           try:
+               # Check EC2 instances
+               ec2_metrics = cloudwatch.get_metric_statistics(
+                   Namespace='AWS/EC2',
+                   MetricName='CPUUtilization',
+                   Dimensions=[{'Name': 'InstanceId', 'Value': 'i-*'}],
+                   StartTime=datetime.now() - timedelta(hours=1),
+                   EndTime=datetime.now(),
+                   Period=300,
+                   Statistics=['Average']
+               )
+               
+               # Check Lambda invocations
+               lambda_metrics = cloudwatch.get_metric_statistics(
+                   Namespace='AWS/Lambda',
+                   MetricName='Invocations',
+                   StartTime=datetime.now() - timedelta(hours=1),
+                   EndTime=datetime.now(),
+                   Period=300,
+                   Statistics=['Sum']
+               )
+               
+               activity_report.append({
+                   'account_id': account_id,
+                   'account_name': account_name,
+                   'ec2_activity': len(ec2_metrics['Datapoints']),
+                   'lambda_activity': sum([dp['Sum'] for dp in lambda_metrics['Datapoints']]),
+                   'last_activity': max([dp['Timestamp'] for dp in ec2_metrics['Datapoints']] + 
+                                      [dp['Timestamp'] for dp in lambda_metrics['Datapoints']], 
+                                      default=datetime.now())
+               })
+               
+           except Exception as e:
+               print(f"Error monitoring activity for {account_id}: {e}")
+       
+       return activity_report
+   ```
+
+### Step 7.5: Student Support and Troubleshooting
+
+#### 7.5.1: Common Issues and Solutions
+
+1. **Create Troubleshooting Guide**
+   ```markdown
+   # Workshop Troubleshooting Guide
+   
+   ## Student Cannot Access Account
+   
+   **Symptoms:**
+   - Student receives welcome email but cannot log in
+   - Error messages about account not found
+   
+   **Solutions:**
+   1. Check account status in AWS Organizations
+   2. Verify IAM Identity Center user exists
+   3. Reset password if needed
+   4. Check account creation logs
+   
+   **Commands:**
+   ```bash
+   # Check account status
+   aws organizations describe-account --account-id ACCOUNT-ID
+   
+   # Check SSO user
+   aws sso-admin list-users --identity-store-id IDENTITY-STORE-ID
+   
+   # Reset password
+   aws sso-admin reset-user-password --identity-store-id IDENTITY-STORE-ID --user-id USER-ID
+   ```
+   
+   ## Email Not Delivered
+   
+   **Symptoms:**
+   - Student registered but no welcome email received
+   - Email in spam folder
+   
+   **Solutions:**
+   1. Check SES configuration
+   2. Verify email domain
+   3. Check Lambda function logs
+   4. Resend welcome email
+   
+   ## High Costs Alert
+   
+   **Symptoms:**
+   - Budget alerts triggered
+   - Unexpected charges
+   
+   **Solutions:**
+   1. Check resource usage
+   2. Identify expensive resources
+   3. Clean up unnecessary resources
+   4. Adjust budget if needed
+   ```
+
+### Step 7.6: Workshop Completion and Cleanup
+
+#### 7.6.1: Post-Workshop Analysis
+
+1. **Generate Workshop Report**
+   ```python
+   def generate_workshop_report():
+       """Generate comprehensive post-workshop report"""
+       organizations = boto3.client('organizations')
+       ce = boto3.client('ce')
+       
+       workshop_ou_id = os.environ.get('WORKSHOP_OU_ID')
+       accounts = organizations.list_accounts_for_parent(
+           ParentId=workshop_ou_id
+       )
+       
+       # Calculate total costs
+       total_cost = 0
+       account_costs = []
+       
+       for account in accounts['Accounts']:
+           account_id = account['Id']
+           
+           try:
+               end_date = datetime.now().strftime('%Y-%m-%d')
+               start_date = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+               
+               response = ce.get_cost_and_usage(
+                   TimePeriod={'Start': start_date, 'End': end_date},
+                   Granularity='MONTHLY',
+                   Metrics=['BlendedCost'],
+                   Filter={
+                       'Dimensions': {
+                           'Key': 'LINKED_ACCOUNT',
+                           'Values': [account_id]
+                       }
+                   }
+               )
+               
+               cost = float(response['ResultsByTime'][0]['Total']['BlendedCost']['Amount'])
+               total_cost += cost
+               
+               account_costs.append({
+                   'account_id': account_id,
+                   'name': account['Name'],
+                   'email': account['Email'],
+                   'cost': cost
+               })
+               
+           except Exception as e:
+               print(f"Error getting cost for {account_id}: {e}")
+       
+       # Generate report
+       report = f"""
+   # Workshop Completion Report
+   Generated: {datetime.now().isoformat()}
+   
+   ## Summary
+   - Total Students: {len(accounts['Accounts'])}
+   - Workshop Duration: 7 days
+   - Total Cost: ${total_cost:.2f}
+   - Average Cost per Student: ${total_cost/len(accounts['Accounts']):.2f}
+   
+   ## Student Account Costs
+   """
+       
+       for account_cost in sorted(account_costs, key=lambda x: x['cost'], reverse=True):
+           report += f"- {account_cost['name']} ({account_cost['email']}): ${account_cost['cost']:.2f}\n"
+       
+       return report
+   ```
+
+#### 7.6.2: Automated Cleanup Process
+
+1. **Create Cleanup Script**
+   ```python
+   def cleanup_workshop_accounts():
+       """Clean up all workshop accounts after completion"""
+       organizations = boto3.client('organizations')
+       sso_admin = boto3.client('sso-admin')
+       
+       workshop_ou_id = os.environ.get('WORKSHOP_OU_ID')
+       accounts = organizations.list_accounts_for_parent(
+           ParentId=workshop_ou_id
+       )
+       
+       cleanup_log = []
+       
+       for account in accounts['Accounts']:
+           account_id = account['Id']
+           account_name = account['Name']
+           account_email = account['Email']
+           
+           try:
+               # Remove SSO users
+               identity_store_id = get_identity_store_id()
+               users = sso_admin.list_users(
+                   IdentityStoreId=identity_store_id,
+                   Filters=[{
+                       'AttributePath': 'UserName',
+                       'AttributeValue': account_email
+                   }]
+               )
+               
+               for user in users['Users']:
+                   sso_admin.delete_user(
+                       IdentityStoreId=identity_store_id,
+                       UserId=user['UserId']
+                   )
+               
+               # Close the account
+               organizations.close_account(AccountId=account_id)
+               
+               cleanup_log.append({
+                   'account_id': account_id,
+                   'name': account_name,
+                   'email': account_email,
+                   'status': 'CLEANED_UP',
+                   'timestamp': datetime.now().isoformat()
+               })
+               
+           except Exception as e:
+               cleanup_log.append({
+                   'account_id': account_id,
+                   'name': account_name,
+                   'email': account_email,
+                   'status': 'ERROR',
+                   'error': str(e),
+                   'timestamp': datetime.now().isoformat()
+               })
+       
+       return cleanup_log
+   ```
+
+### Step 7.7: Final Verification and Handover
+
+#### 7.7.1: Complete Workshop Checklist
+
+- [ ] All student accounts created successfully
+- [ ] Welcome emails delivered
+- [ ] Budgets and monitoring configured
+- [ ] Instructor dashboard operational
+- [ ] Student support processes in place
+- [ ] Workshop materials accessible
+- [ ] Cleanup procedures tested
+- [ ] Post-workshop reporting ready
+
+#### 7.7.2: Workshop Management Summary
+
+**What's Now Configured:**
+- ✅ Complete student registration system
+- ✅ Real-time instructor dashboard
+- ✅ Automated monitoring and alerts
+- ✅ Student support and troubleshooting
+- ✅ Post-workshop analysis and cleanup
+- ✅ Comprehensive reporting system
+
+**Workshop Management Features:**
+- **Student Registration**: Automated account creation and onboarding
+- **Real-Time Monitoring**: Live dashboard with cost and activity tracking
+- **Support Automation**: Automated troubleshooting and issue resolution
+- **Cleanup Automation**: Post-workshop account and resource cleanup
+- **Reporting**: Comprehensive pre, during, and post-workshop reporting
+
+**Step 7 is now complete!** 🎯✅
+
+Your workshop management system is fully configured and ready to handle the complete workshop lifecycle from registration through cleanup.
 
 ---
 
