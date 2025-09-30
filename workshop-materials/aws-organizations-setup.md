@@ -1106,45 +1106,24 @@ Step 7 covers the complete workshop management lifecycle, from pre-workshop prep
 
 #### 7.1.2: Student Communication Setup
 
-**Step 1: Create S3 Bucket for Student Registration**
+**Step 1: Verify Existing S3 Setup**
 
-```bash
-# Create S3 bucket for workshop website
-aws s3 mb s3://workshop-registration-2025-$(date +%s)
+1. **Go to S3 Console**
+   - Navigate to AWS Console → Services → S3
+   - Find your existing bucket: `infrastructure-workshop-2025-registration-{account-id}`
+   - Click on the bucket name
 
-# Note the bucket name (replace YOUR_BUCKET_NAME with actual name)
-export WORKSHOP_BUCKET="workshop-registration-2025-$(date +%s)"
-echo "Workshop bucket: $WORKSHOP_BUCKET"
-```
+2. **Verify Files Are Already Uploaded**
+   - You should see these files (from Step 3.6):
+     - `index.html` (this is your student registration page)
+     - `instructor-dashboard.html` (this is your instructor dashboard)
+   - If these files are missing, go back to Step 3.6 and upload them
 
-**Step 2: Configure S3 Bucket for Static Website Hosting**
-
-```bash
-# Enable static website hosting
-aws s3 website s3://$WORKSHOP_BUCKET --index-document student-registration.html --error-document error.html
-
-# Set bucket policy for public read access
-cat > bucket-policy.json << EOF
-{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Sid": "PublicReadGetObject",
-            "Effect": "Allow",
-            "Principal": "*",
-            "Action": "s3:GetObject",
-            "Resource": "arn:aws:s3:::$WORKSHOP_BUCKET/*"
-        }
-    ]
-}
-EOF
-
-# Apply bucket policy
-aws s3api put-bucket-policy --bucket $WORKSHOP_BUCKET --policy file://bucket-policy.json
-
-# Verify bucket policy
-aws s3api get-bucket-policy --bucket $WORKSHOP_BUCKET
-```
+3. **Check Website Configuration**
+   - Go to "Properties" tab
+   - Scroll down to "Static website hosting"
+   - Should show "Enabled" with `index.html` as the index document
+   - Note the "Bucket website endpoint" URL for later use
 
 **Step 3: Create Student Registration Page**
 
@@ -1428,27 +1407,22 @@ echo "Open this URL in your browser: http://$WORKSHOP_BUCKET.s3-website-us-east-
 
 #### 7.3.1: Deploy Instructor Dashboard
 
-**Step 1: Upload Dashboard Files to S3**
+**Step 1: Verify Existing Dashboard Setup**
 
 1. **Go to S3 Console**
    - Navigate to AWS Console → Services → S3
-   - Find your workshop bucket (e.g., `workshop-registration-2025-XXXXX`)
+   - Find your existing bucket: `infrastructure-workshop-2025-registration-{account-id}`
    - Click on the bucket name
 
-2. **Upload Instructor Dashboard Files**
-   - Click "Upload"
-   - Click "Add files"
-   - Navigate to your local `workshop-materials/automation/` folder
-   - Select `instructor-dashboard.html`
-   - Click "Upload"
+2. **Verify Dashboard File Is Already Uploaded**
+   - You should see `instructor-dashboard.html` (uploaded in Step 3.6)
+   - If missing, go back to Step 3.6 and upload it
 
-3. **Set Correct Content Type**
-   - After upload, click on `instructor-dashboard.html`
+3. **Get Dashboard URL**
    - Go to "Properties" tab
-   - Scroll down to "Metadata"
-   - Click "Edit"
-   - Set "Content-Type" to `text/html`
-   - Click "Save changes"
+   - Scroll down to "Static website hosting"
+   - Copy the "Bucket website endpoint" URL
+   - Your dashboard will be at: `[BUCKET_WEBSITE_URL]/instructor-dashboard.html`
 
 **Step 2: Create Lambda Function for Dashboard API**
 
