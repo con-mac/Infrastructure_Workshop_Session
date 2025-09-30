@@ -1125,182 +1125,43 @@ Step 7 covers the complete workshop management lifecycle, from pre-workshop prep
    - Should show "Enabled" with `index.html` as the index document
    - Note the "Bucket website endpoint" URL for later use
 
-**Step 3: Create Student Registration Page**
+**Step 3: Update Registration Page API Endpoint**
 
-```bash
-# Create the registration page with your actual API Gateway endpoint
-cat > student-registration.html << 'EOF'
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Workshop Registration</title>
-    <style>
-        body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
-        .container { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .form-group { margin-bottom: 20px; }
-        label { display: block; margin-bottom: 8px; font-weight: bold; color: #333; }
-        input[type="email"], input[type="text"] { 
-            width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 6px; 
-            font-size: 16px; box-sizing: border-box;
-        }
-        input[type="email"]:focus, input[type="text"]:focus { 
-            border-color: #007cba; outline: none; 
-        }
-        button { 
-            background: #007cba; color: white; padding: 15px 30px; border: none; 
-            border-radius: 6px; cursor: pointer; font-size: 16px; width: 100%;
-        }
-        button:hover { background: #005a8b; }
-        button:disabled { background: #ccc; cursor: not-allowed; }
-        .success { color: #28a745; margin-top: 15px; padding: 10px; background: #d4edda; border-radius: 4px; }
-        .error { color: #dc3545; margin-top: 15px; padding: 10px; background: #f8d7da; border-radius: 4px; }
-        .loading { color: #007cba; margin-top: 15px; }
-        h1 { color: #333; text-align: center; margin-bottom: 30px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🚀 Infrastructure Workshop 2025 Registration</h1>
-        <form id="registrationForm">
-            <div class="form-group">
-                <label for="email">Email Address:</label>
-                <input type="email" id="email" name="email" required placeholder="your.email@university.edu">
-            </div>
-            <div class="form-group">
-                <label for="name">Full Name:</label>
-                <input type="text" id="name" name="name" required placeholder="John Smith">
-            </div>
-            <div class="form-group">
-                <label for="studentId">Student ID (Optional):</label>
-                <input type="text" id="studentId" name="studentId" placeholder="12345678">
-            </div>
-            <button type="submit" id="submitBtn">Register for Workshop</button>
-        </form>
-        <div id="message"></div>
-    </div>
+The registration page is already uploaded as `index.html`, but it needs to be updated with your actual API Gateway endpoint:
 
-    <script>
-        document.getElementById('registrationForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const submitBtn = document.getElementById('submitBtn');
-            const messageDiv = document.getElementById('message');
-            
-            // Disable button and show loading
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Registering...';
-            messageDiv.innerHTML = '<div class="loading">Creating your AWS account, please wait...</div>';
-            
-            const formData = {
-                email: document.getElementById('email').value,
-                name: document.getElementById('name').value,
-                studentId: document.getElementById('studentId').value
-            };
-            
-            try {
-                const response = await fetch('https://5ag5k2p4aa.execute-api.us-east-1.amazonaws.com/prod/register', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(formData)
-                });
-                
-                const result = await response.json();
-                
-                if (response.ok) {
-                    messageDiv.innerHTML = `
-                        <div class="success">
-                            <strong>Registration Successful! 🎉</strong><br>
-                            Your AWS account is being created. You will receive an email with login details shortly.<br>
-                            <strong>Account Request ID:</strong> ${result.create_account_request_id}
-                        </div>
-                    `;
-                    document.getElementById('registrationForm').reset();
-                } else {
-                    messageDiv.innerHTML = `
-                        <div class="error">
-                            <strong>Registration Failed</strong><br>
-                            ${result.error || 'Please try again or contact support.'}
-                        </div>
-                    `;
-                }
-            } catch (error) {
-                messageDiv.innerHTML = `
-                    <div class="error">
-                        <strong>Registration Failed</strong><br>
-                        Network error: ${error.message}
-                    </div>
-                `;
-            } finally {
-                // Re-enable button
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Register for Workshop';
-            }
-        });
-    </script>
-</body>
-</html>
-EOF
+1. **Download Current Registration Page**
+   - Go to S3 Console
+   - Find your bucket: `infrastructure-workshop-2025-registration-{account-id}`
+   - Click on `index.html`
+   - Click "Download"
 
-# Create error page
-cat > error.html << 'EOF'
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Error - Workshop Registration</title>
-    <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-        h1 { color: #dc3545; }
-    </style>
-</head>
-<body>
-    <h1>Oops! Something went wrong</h1>
-    <p>Please try again later or contact support.</p>
-</body>
-</html>
-EOF
-```
+2. **Update API Endpoint**
+   - Open the downloaded file in a text editor
+   - Find the fetch URL (should be around line 1222)
+   - Replace `YOUR-API-GATEWAY-ENDPOINT` with your actual API Gateway URL from Step 7.1.1
+   - Save the file
 
-**Step 4: Upload and Deploy Registration Page**
+3. **Re-upload Updated File**
+   - Go back to S3 Console
+   - Click "Upload"
+   - Select the updated `index.html` file
+   - Click "Upload" (this will overwrite the existing file)
 
-```bash
-# Upload files to S3
-aws s3 cp student-registration.html s3://$WORKSHOP_BUCKET/
-aws s3 cp error.html s3://$WORKSHOP_BUCKET/
+**Step 4: Test Registration Flow**
 
-# Set correct content type
-aws s3 cp s3://$WORKSHOP_BUCKET/student-registration.html s3://$WORKSHOP_BUCKET/student-registration.html --content-type "text/html"
-aws s3 cp s3://$WORKSHOP_BUCKET/error.html s3://$WORKSHOP_BUCKET/error.html --content-type "text/html"
+1. **Test Registration Page**
+   - Go to S3 Console
+   - Find your bucket
+   - Go to "Properties" tab
+   - Scroll down to "Static website hosting"
+   - Copy the "Bucket website endpoint" URL
+   - Open this URL in your browser
+   - Verify the registration form loads
 
-# Get website URL
-aws s3api get-bucket-website --bucket $WORKSHOP_BUCKET --query 'WebsiteConfiguration.IndexDocument.Suffix' --output text
-echo "Registration URL: http://$WORKSHOP_BUCKET.s3-website-us-east-1.amazonaws.com"
-```
-
-**Step 5: Test Complete Registration Flow**
-
-```bash
-# Test the registration page
-curl -I http://$WORKSHOP_BUCKET.s3-website-us-east-1.amazonaws.com
-
-# Test registration via API
-curl -X POST \
-  https://5ag5k2p4aa.execute-api.us-east-1.amazonaws.com/prod/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test-student@example.com","name":"Test Student","studentId":"12345"}'
-```
-
-**Step 6: Verify Setup**
-
-```bash
-# Check S3 bucket contents
-aws s3 ls s3://$WORKSHOP_BUCKET/
-
-# Check website configuration
-aws s3api get-bucket-website --bucket $WORKSHOP_BUCKET
-
-# Test website accessibility
-echo "Open this URL in your browser: http://$WORKSHOP_BUCKET.s3-website-us-east-1.amazonaws.com"
-```
+2. **Test API Endpoint**
+   - Use the API Gateway URL from Step 7.1.1
+   - Test with a sample registration
+   - Verify the Lambda function processes the request
 
 #### 7.1.3: Instructor Preparation
 
