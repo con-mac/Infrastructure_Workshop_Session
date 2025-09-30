@@ -1450,9 +1450,67 @@ echo "Open this URL in your browser: http://$WORKSHOP_BUCKET.s3-website-us-east-
    - Set "Content-Type" to `text/html`
    - Click "Save changes"
 
-```bash
-# Create Lambda function for instructor dashboard
-cat > instructor-dashboard-lambda.py << 'EOF'
+**Step 2: Create Lambda Function for Dashboard API**
+
+1. **Go to Lambda Console**
+   - Navigate to AWS Console → Services → Lambda
+   - Click "Create function"
+
+2. **Configure Function**
+   - **Function name:** `instructor-dashboard-api`
+   - **Runtime:** Python 3.9
+   - **Architecture:** x86_64
+   - Click "Create function"
+
+3. **Update Function Code**
+   - In the "Code" tab, delete the existing code
+   - Copy the contents of `workshop-materials/automation/instructor-dashboard.py`
+   - Paste it into the code editor
+   - Add this Lambda handler at the top:
+   ```python
+   def lambda_handler(event, context):
+       """Lambda handler for instructor dashboard API"""
+       try:
+           # Get workshop status
+           status = get_workshop_status()
+           
+           return {
+               'statusCode': 200,
+               'headers': {
+                   'Content-Type': 'application/json',
+                   'Access-Control-Allow-Origin': '*',
+                   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                   'Access-Control-Allow-Headers': 'Content-Type'
+               },
+               'body': json.dumps(status)
+           }
+       except Exception as e:
+           return {
+               'statusCode': 500,
+               'headers': {
+                   'Content-Type': 'application/json',
+                   'Access-Control-Allow-Origin': '*'
+               },
+               'body': json.dumps({'error': str(e)})
+           }
+   ```
+   - Click "Deploy"
+
+4. **Configure Environment Variables**
+   - Go to "Configuration" tab
+   - Click "Environment variables"
+   - Click "Edit"
+   - Add environment variable:
+     - **Key:** `WORKSHOP_OU_ID`
+     - **Value:** `ou-01dw-2r1xz8cp`
+   - Click "Save"
+
+5. **Update Function Role**
+   - Go to "Configuration" tab
+   - Click "Permissions"
+   - Click on the execution role name
+   - This will open IAM in a new tab
+   - Add the same permissions as your account creation function
 import json
 import boto3
 from datetime import datetime, timedelta
