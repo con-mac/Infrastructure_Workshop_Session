@@ -1287,172 +1287,208 @@ If you want to monitor registrations, you can use the existing `cost-monitoring.
    - Copy the "Bucket website endpoint" URL
    - Your dashboard will be at: `[BUCKET_WEBSITE_URL]/instructor-dashboard.html`
 
-**Step 2: Create Lambda Function for Dashboard API**
+**Step 2: Create Lambda Function for Dashboard API (CLI Method)**
 
-1. **Go to Lambda Console**
-   - Navigate to AWS Console → Services → Lambda
-   - Click "Create function"
+```bash
+# Create the Lambda function
+aws lambda create-function \
+  --function-name instructor-dashboard-api \
+  --runtime python3.9 \
+  --role arn:aws:iam::535002854646:role/PA-Consulting-Infrastructure-Wo-AccountCreationRole-SH8cjx5sCx5Z \
+  --handler instructor-dashboard.lambda_handler \
+  --zip-file fileb://instructor-dashboard-lambda.zip \
+  --timeout 30 \
+  --memory-size 256 \
+  --environment Variables='{WORKSHOP_OU_ID=ou-01dw-2r1xz8cp}'
+```
 
-2. **Configure Function**
-   - **Function name:** `instructor-dashboard-api`
-   - **Runtime:** Python 3.9
-   - **Architecture:** x86_64
-   - Click "Create function"
+**Step 3: Create the Lambda Package**
 
-3. **Update Function Code**
-   - In the "Code" tab, delete the existing code
-   - Copy the contents of `workshop-materials/automation/instructor-dashboard.py`
-   - Paste it into the code editor
-   - Add this Lambda handler at the top:
-   ```python
-   def lambda_handler(event, context):
-       """Lambda handler for instructor dashboard API"""
-       try:
-           # Get workshop status
-           status = get_workshop_status()
-           
-           return {
-               'statusCode': 200,
-               'headers': {
-                   'Content-Type': 'application/json',
-                   'Access-Control-Allow-Origin': '*',
-                   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-                   'Access-Control-Allow-Headers': 'Content-Type'
-               },
-               'body': json.dumps(status)
-           }
-       except Exception as e:
-           return {
-               'statusCode': 500,
-               'headers': {
-                   'Content-Type': 'application/json',
-                   'Access-Control-Allow-Origin': '*'
-               },
-               'body': json.dumps({'error': str(e)})
-           }
-   ```
-   - Click "Deploy"
+```bash
+# Create a zip file with the instructor dashboard code
+cd workshop-materials/automation/
 
-4. **Configure Environment Variables**
-   - Go to "Configuration" tab
-   - Click "Environment variables"
-   - Click "Edit"
-   - Add environment variable:
-     - **Key:** `WORKSHOP_OU_ID`
-     - **Value:** `ou-01dw-2r1xz8cp`
-   - Click "Save"
+# Create the Lambda handler file
+cat > instructor-dashboard-lambda.py << 'EOF'
+import json
+import boto3
+from datetime import datetime, timedelta
+import os
 
-5. **Update Function Role (CRITICAL STEP)**
-   - Go to "Configuration" tab
-   - Click "Permissions"
-   - Click on the execution role name (it will be something like `instructor-dashboard-api-role-xxxxx`)
-   - This will open IAM in a new tab
-   - Click "Add permissions" → "Attach policies"
-   - Search for and select: `PA-Consulting-Infrastructure-Wo-AccountCreationRole-SH8cjx5sCx5Z`
-   - Click "Attach policy"
-   - **OR** if you can't find that policy, add this custom policy:
-     - Click "Add permissions" → "Create inline policy"
-     - Click "JSON" tab
-     - Paste this policy:
-     ```json
-     {
-         "Version": "2012-10-17",
-         "Statement": [
-             {
-                 "Effect": "Allow",
-                 "Action": [
-                     "organizations:*",
-                     "identitystore:*",
-                     "ses:SendEmail",
-                     "ses:SendRawEmail",
-                     "budgets:*",
-                     "s3:GetObject",
-                     "s3:PutObject"
-                 ],
-                 "Resource": "*"
-             }
-         ]
-     }
-     ```
-     - Click "Next"
-     - Name it: `InstructorDashboardPolicy`
-     - Click "Create policy"
+def lambda_handler(event, context):
+    """Lambda handler for instructor dashboard API"""
+    try:
+        # Get workshop status
+        status = get_workshop_status()
+        
+        return {
+            'statusCode': 200,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type'
+            },
+            'body': json.dumps(status)
+        }
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            'body': json.dumps({'error': str(e)})
+        }
 
-6. **Test the Function**
-   - Go back to Lambda console
-   - Click "Test" button
-   - Create a new test event with this JSON:
-   ```json
-   {}
-   ```
-   - Name it: `TestDashboard`
-   - Click "Create"
-   - Click "Test" button
-   - You should see a successful response with workshop data
+def get_workshop_status():
+    """Get comprehensive workshop status"""
+    organizations = boto3.client('organizations')
+    ce = boto3.client('ce')
+    
+    workshop_ou_id = os.environ.get('WORKSHOP_OU_ID', 'ou-01dw-2r1xz8cp')
+    
+    # Get all accounts
+    accounts = organizations.list_accounts_for_parent(
+        ParentId=workshop_ou_id
+    )
+    
+    # Get cost information
+    try:
+        cost_data = ce.get_cost_and_usage(
+            TimePeriod={
+                'Start': (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d'),
+                'End': datetime.now().strftime('%Y-%m-%d')
+            },
+            Granularity='MONTHLY',
+            Metrics=['BlendedCost']
+        )
+    except Exception as e:
+        cost_data = {'error': str(e)}
+    
+    return {
+        'workshop_info': {
+            'ou_id': workshop_ou_id,
+            'total_accounts': len(accounts['Accounts']),
+            'active_accounts': len([a for a in accounts['Accounts'] if a['Status'] == 'ACTIVE']),
+            'pending_accounts': len([a for a in accounts['Accounts'] if a['Status'] == 'PENDING'])
+        },
+        'accounts': accounts['Accounts'],
+        'cost_data': cost_data,
+        'timestamp': datetime.now().isoformat()
+    }
+EOF
 
-#### 7.3.2: Create API Gateway for Dashboard
+# Create the zip file
+zip instructor-dashboard-lambda.zip instructor-dashboard-lambda.py
+
+# Upload to Lambda
+aws lambda update-function-code \
+  --function-name instructor-dashboard-api \
+  --zip-file fileb://instructor-dashboard-lambda.zip
+```
+
+**Step 4: Test the Function**
+
+```bash
+# Test the Lambda function
+aws lambda invoke \
+  --function-name instructor-dashboard-api \
+  --payload '{}' \
+  --cli-binary-format raw-in-base64-out \
+  response.json
+
+# Check the response
+cat response.json
+```
+
+#### 7.3.2: Create API Gateway for Dashboard (CLI Method)
 
 **Step 1: Create API Gateway**
 
-1. **Go to API Gateway Console**
-   - Navigate to AWS Console → Services → API Gateway
-   - Click "Create API"
-   - Select "REST API"
-   - Click "Build"
+```bash
+# Create the API Gateway
+aws apigateway create-rest-api \
+  --name "instructor-dashboard-api" \
+  --description "API for instructor dashboard data"
+```
 
-2. **Configure API**
-   - **API name:** `instructor-dashboard-api`
-   - **Description:** `API for instructor dashboard data`
-   - **Endpoint Type:** Regional
-   - Click "Create API"
+**Note the API ID from the response (e.g., `abc123def4`)**
 
-3. **Create Resource**
-   - Click "Actions" → "Create Resource"
-   - **Resource Name:** `dashboard`
-   - **Resource Path:** `dashboard`
-   - **Enable CORS:** Check this box
-   - Click "Create Resource"
+**Step 2: Get Root Resource ID**
 
-4. **Create Method**
-   - Select the `/dashboard` resource
-   - Click "Actions" → "Create Method"
-   - Select "GET" from dropdown
-   - Click the checkmark
+```bash
+# Get the root resource ID (replace YOUR_API_ID with the actual ID)
+aws apigateway get-resources --rest-api-id YOUR_API_ID
+```
 
-5. **Configure Method**
-   - **Integration type:** Lambda Function
-   - **Use Lambda Proxy integration:** Check this box
-   - **Lambda Function:** `instructor-dashboard-api`
-   - **Use Default Timeout:** Check this box
-   - Click "Save"
-   - Click "OK" when prompted to add Lambda permissions
+**Note the root resource ID from the response (e.g., `hkbttbw4k1`)**
 
-**Step 2: Deploy API**
+**Step 3: Create Dashboard Resource**
 
-1. **Deploy API**
-   - Click "Actions" → "Deploy API"
-   - **Deployment stage:** `[New Stage]`
-   - **Stage name:** `prod`
-   - **Stage description:** `Production stage for instructor dashboard`
-   - Click "Deploy"
+```bash
+# Create the /dashboard resource (replace with your actual IDs)
+aws apigateway create-resource \
+  --rest-api-id YOUR_API_ID \
+  --parent-id ROOT_RESOURCE_ID \
+  --path-part "dashboard"
+```
 
-2. **Get API Endpoint**
-   - Note the "Invoke URL" (e.g., `https://abc123.execute-api.us-east-1.amazonaws.com/prod`)
-   - Your dashboard API will be at: `[INVOKE_URL]/dashboard`
+**Note the dashboard resource ID from the response**
 
-**Step 3: Test API Gateway**
+**Step 4: Create GET Method**
 
-1. **Test the Endpoint**
-   - Click on the `/dashboard` resource
-   - Click "GET" method
-   - Click "Test"
-   - Click "Test" button
-   - You should see workshop data returned
+```bash
+# Create GET method for dashboard (replace with your actual IDs)
+aws apigateway put-method \
+  --rest-api-id YOUR_API_ID \
+  --resource-id DASHBOARD_RESOURCE_ID \
+  --http-method GET \
+  --authorization-type NONE
+```
 
-2. **Test from Browser**
-   - Open a new browser tab
-   - Go to: `[YOUR_API_GATEWAY_URL]/dashboard`
-   - You should see JSON data with workshop information
+**Step 5: Configure Lambda Integration**
+
+```bash
+# Configure Lambda integration (replace with your actual IDs and account ID)
+aws apigateway put-integration \
+  --rest-api-id YOUR_API_ID \
+  --resource-id DASHBOARD_RESOURCE_ID \
+  --http-method GET \
+  --type AWS_PROXY \
+  --integration-http-method POST \
+  --uri "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:YOUR_ACCOUNT_ID:function:instructor-dashboard-api/invocations"
+```
+
+**Step 6: Deploy API**
+
+```bash
+# Deploy the API
+aws apigateway create-deployment \
+  --rest-api-id YOUR_API_ID \
+  --stage-name "prod"
+```
+
+**Step 7: Add Lambda Permission**
+
+```bash
+# Allow API Gateway to invoke Lambda (replace with your actual IDs and account ID)
+aws lambda add-permission \
+  --function-name instructor-dashboard-api \
+  --statement-id apigateway-invoke-dashboard \
+  --action lambda:InvokeFunction \
+  --principal apigateway.amazonaws.com \
+  --source-arn "arn:aws:execute-api:us-east-1:YOUR_ACCOUNT_ID:YOUR_API_ID/*/*"
+```
+
+**Step 8: Test the API**
+
+```bash
+# Test the dashboard endpoint (replace with your actual API ID)
+curl https://YOUR_API_ID.execute-api.us-east-1.amazonaws.com/prod/dashboard
+```
+
+**You should see JSON data with workshop information**
 
 ### Step 7.4: Monitoring and Alerts Setup
 
