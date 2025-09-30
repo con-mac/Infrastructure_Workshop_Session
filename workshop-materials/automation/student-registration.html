@@ -2,33 +2,73 @@
 <html>
 <head>
     <title>Workshop Registration</title>
+    <!-- Cache bust: v2.0 - Purple gradient with rocket icon -->
     <style>
-        body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
-        .container { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .form-group { margin-bottom: 20px; }
-        label { display: block; margin-bottom: 8px; font-weight: bold; color: #333; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            max-width: 600px; margin: 0 auto; padding: 20px; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container { 
+            background: white; padding: 40px; border-radius: 15px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-top: 20px;
+        }
+        .form-group { margin-bottom: 25px; }
+        label { 
+            display: block; margin-bottom: 10px; font-weight: 600; 
+            color: #4a5568; font-size: 14px;
+        }
         input[type="email"], input[type="text"] { 
-            width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 6px; 
-            font-size: 16px; box-sizing: border-box;
+            width: 100%; padding: 15px; border: 2px solid #e2e8f0; 
+            border-radius: 8px; font-size: 16px; box-sizing: border-box;
+            transition: all 0.3s ease;
         }
         input[type="email"]:focus, input[type="text"]:focus { 
-            border-color: #007cba; outline: none; 
+            border-color: #667eea; outline: none; 
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
         button { 
-            background: #007cba; color: white; padding: 15px 30px; border: none; 
-            border-radius: 6px; cursor: pointer; font-size: 16px; width: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; padding: 18px 30px; border: none; 
+            border-radius: 8px; cursor: pointer; font-size: 16px; 
+            width: 100%; font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
         }
-        button:hover { background: #005a8b; }
-        button:disabled { background: #ccc; cursor: not-allowed; }
-        .success { color: #28a745; margin-top: 15px; padding: 10px; background: #d4edda; border-radius: 4px; }
-        .error { color: #dc3545; margin-top: 15px; padding: 10px; background: #f8d7da; border-radius: 4px; }
-        .loading { color: #007cba; margin-top: 15px; }
-        h1 { color: #333; text-align: center; margin-bottom: 30px; }
+        button:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+        button:disabled { 
+            background: #a0aec0; cursor: not-allowed; 
+            transform: none; box-shadow: none;
+        }
+        .success { 
+            color: #22543d; margin-top: 20px; padding: 15px; 
+            background: #c6f6d5; border-radius: 8px; 
+            border-left: 4px solid #38a169;
+        }
+        .error { 
+            color: #742a2a; margin-top: 20px; padding: 15px; 
+            background: #fed7d7; border-radius: 8px;
+            border-left: 4px solid #e53e3e;
+        }
+        .loading { 
+            color: #667eea; margin-top: 20px; 
+            text-align: center; font-weight: 500;
+        }
+        h1 { 
+            color: #2d3748; text-align: center; margin-bottom: 40px; 
+            font-size: 28px; font-weight: 700;
+        }
+        .rocket { font-size: 32px; margin-right: 10px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🚀 Infrastructure Workshop 2025 Registration</h1>
+        <h1><span class="rocket">🚀</span>Infrastructure Workshop 2025 Registration</h1>
         <form id="registrationForm">
             <div class="form-group">
                 <label for="email">Email Address:</label>
