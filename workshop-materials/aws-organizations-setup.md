@@ -1106,86 +1106,222 @@ Step 7 covers the complete workshop management lifecycle, from pre-workshop prep
 
 #### 7.1.2: Student Communication Setup
 
-1. **Create Student Registration Page**
-   Create `student-registration.html`:
-   ```html
-   <!DOCTYPE html>
-   <html>
-   <head>
-       <title>Workshop Registration</title>
-       <style>
-           body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
-           .form-group { margin-bottom: 15px; }
-           label { display: block; margin-bottom: 5px; font-weight: bold; }
-           input[type="email"], input[type="text"] { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
-           button { background: #007cba; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
-           .success { color: green; margin-top: 10px; }
-           .error { color: red; margin-top: 10px; }
-       </style>
-   </head>
-   <body>
-       <h1>Infrastructure Workshop 2025 Registration</h1>
-       <form id="registrationForm">
-           <div class="form-group">
-               <label for="email">Email Address:</label>
-               <input type="email" id="email" name="email" required>
-           </div>
-           <div class="form-group">
-               <label for="name">Full Name:</label>
-               <input type="text" id="name" name="name" required>
-           </div>
-           <div class="form-group">
-               <label for="studentId">Student ID (Optional):</label>
-               <input type="text" id="studentId" name="studentId">
-           </div>
-           <button type="submit">Register for Workshop</button>
-       </form>
-       <div id="message"></div>
-   
-       <script>
-           document.getElementById('registrationForm').addEventListener('submit', async function(e) {
-               e.preventDefault();
-               
-               const formData = {
-                   email: document.getElementById('email').value,
-                   name: document.getElementById('name').value,
-                   studentId: document.getElementById('studentId').value
-               };
-               
-               try {
-                   const response = await fetch('YOUR-API-GATEWAY-ENDPOINT', {
-                       method: 'POST',
-                       headers: { 'Content-Type': 'application/json' },
-                       body: JSON.stringify(formData)
-                   });
-                   
-                   const result = await response.json();
-                   
-                   if (response.ok) {
-                       document.getElementById('message').innerHTML = 
-                           '<div class="success">Registration successful! Check your email for account details.</div>';
-                   } else {
-                       document.getElementById('message').innerHTML = 
-                           '<div class="error">Registration failed: ' + result.error + '</div>';
-                   }
-               } catch (error) {
-                   document.getElementById('message').innerHTML = 
-                       '<div class="error">Registration failed: ' + error.message + '</div>';
-               }
-           });
-       </script>
-   </body>
-   </html>
-   ```
+**Step 1: Create S3 Bucket for Student Registration**
 
-2. **Upload to S3 and Configure**
-   ```bash
-   # Upload registration page
-   aws s3 cp student-registration.html s3://your-workshop-bucket/
-   
-   # Set up static website hosting
-   aws s3 website s3://your-workshop-bucket --index-document student-registration.html
-   ```
+```bash
+# Create S3 bucket for workshop website
+aws s3 mb s3://workshop-registration-2025-$(date +%s)
+
+# Note the bucket name (replace YOUR_BUCKET_NAME with actual name)
+export WORKSHOP_BUCKET="workshop-registration-2025-$(date +%s)"
+echo "Workshop bucket: $WORKSHOP_BUCKET"
+```
+
+**Step 2: Configure S3 Bucket for Static Website Hosting**
+
+```bash
+# Enable static website hosting
+aws s3 website s3://$WORKSHOP_BUCKET --index-document student-registration.html --error-document error.html
+
+# Set bucket policy for public read access
+cat > bucket-policy.json << EOF
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "PublicReadGetObject",
+            "Effect": "Allow",
+            "Principal": "*",
+            "Action": "s3:GetObject",
+            "Resource": "arn:aws:s3:::$WORKSHOP_BUCKET/*"
+        }
+    ]
+}
+EOF
+
+# Apply bucket policy
+aws s3api put-bucket-policy --bucket $WORKSHOP_BUCKET --policy file://bucket-policy.json
+
+# Verify bucket policy
+aws s3api get-bucket-policy --bucket $WORKSHOP_BUCKET
+```
+
+**Step 3: Create Student Registration Page**
+
+```bash
+# Create the registration page with your actual API Gateway endpoint
+cat > student-registration.html << 'EOF'
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Workshop Registration</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
+        .container { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: bold; color: #333; }
+        input[type="email"], input[type="text"] { 
+            width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 6px; 
+            font-size: 16px; box-sizing: border-box;
+        }
+        input[type="email"]:focus, input[type="text"]:focus { 
+            border-color: #007cba; outline: none; 
+        }
+        button { 
+            background: #007cba; color: white; padding: 15px 30px; border: none; 
+            border-radius: 6px; cursor: pointer; font-size: 16px; width: 100%;
+        }
+        button:hover { background: #005a8b; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .success { color: #28a745; margin-top: 15px; padding: 10px; background: #d4edda; border-radius: 4px; }
+        .error { color: #dc3545; margin-top: 15px; padding: 10px; background: #f8d7da; border-radius: 4px; }
+        .loading { color: #007cba; margin-top: 15px; }
+        h1 { color: #333; text-align: center; margin-bottom: 30px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Infrastructure Workshop 2025 Registration</h1>
+        <form id="registrationForm">
+            <div class="form-group">
+                <label for="email">Email Address:</label>
+                <input type="email" id="email" name="email" required placeholder="your.email@university.edu">
+            </div>
+            <div class="form-group">
+                <label for="name">Full Name:</label>
+                <input type="text" id="name" name="name" required placeholder="John Smith">
+            </div>
+            <div class="form-group">
+                <label for="studentId">Student ID (Optional):</label>
+                <input type="text" id="studentId" name="studentId" placeholder="12345678">
+            </div>
+            <button type="submit" id="submitBtn">Register for Workshop</button>
+        </form>
+        <div id="message"></div>
+    </div>
+
+    <script>
+        document.getElementById('registrationForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            const messageDiv = document.getElementById('message');
+            
+            // Disable button and show loading
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Registering...';
+            messageDiv.innerHTML = '<div class="loading">Creating your AWS account, please wait...</div>';
+            
+            const formData = {
+                email: document.getElementById('email').value,
+                name: document.getElementById('name').value,
+                studentId: document.getElementById('studentId').value
+            };
+            
+            try {
+                const response = await fetch('https://5ag5k2p4aa.execute-api.us-east-1.amazonaws.com/prod/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    messageDiv.innerHTML = `
+                        <div class="success">
+                            <strong>Registration Successful! 🎉</strong><br>
+                            Your AWS account is being created. You will receive an email with login details shortly.<br>
+                            <strong>Account Request ID:</strong> ${result.create_account_request_id}
+                        </div>
+                    `;
+                    document.getElementById('registrationForm').reset();
+                } else {
+                    messageDiv.innerHTML = `
+                        <div class="error">
+                            <strong>Registration Failed</strong><br>
+                            ${result.error || 'Please try again or contact support.'}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                messageDiv.innerHTML = `
+                    <div class="error">
+                        <strong>Registration Failed</strong><br>
+                        Network error: ${error.message}
+                    </div>
+                `;
+            } finally {
+                // Re-enable button
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Register for Workshop';
+            }
+        });
+    </script>
+</body>
+</html>
+EOF
+
+# Create error page
+cat > error.html << 'EOF'
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Error - Workshop Registration</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+        h1 { color: #dc3545; }
+    </style>
+</head>
+<body>
+    <h1>Oops! Something went wrong</h1>
+    <p>Please try again later or contact support.</p>
+</body>
+</html>
+EOF
+```
+
+**Step 4: Upload and Deploy Registration Page**
+
+```bash
+# Upload files to S3
+aws s3 cp student-registration.html s3://$WORKSHOP_BUCKET/
+aws s3 cp error.html s3://$WORKSHOP_BUCKET/
+
+# Set correct content type
+aws s3 cp s3://$WORKSHOP_BUCKET/student-registration.html s3://$WORKSHOP_BUCKET/student-registration.html --content-type "text/html"
+aws s3 cp s3://$WORKSHOP_BUCKET/error.html s3://$WORKSHOP_BUCKET/error.html --content-type "text/html"
+
+# Get website URL
+aws s3api get-bucket-website --bucket $WORKSHOP_BUCKET --query 'WebsiteConfiguration.IndexDocument.Suffix' --output text
+echo "Registration URL: http://$WORKSHOP_BUCKET.s3-website-us-east-1.amazonaws.com"
+```
+
+**Step 5: Test Complete Registration Flow**
+
+```bash
+# Test the registration page
+curl -I http://$WORKSHOP_BUCKET.s3-website-us-east-1.amazonaws.com
+
+# Test registration via API
+curl -X POST \
+  https://5ag5k2p4aa.execute-api.us-east-1.amazonaws.com/prod/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test-student@example.com","name":"Test Student","studentId":"12345"}'
+```
+
+**Step 6: Verify Setup**
+
+```bash
+# Check S3 bucket contents
+aws s3 ls s3://$WORKSHOP_BUCKET/
+
+# Check website configuration
+aws s3api get-bucket-website --bucket $WORKSHOP_BUCKET
+
+# Test website accessibility
+echo "Open this URL in your browser: http://$WORKSHOP_BUCKET.s3-website-us-east-1.amazonaws.com"
+```
 
 #### 7.1.3: Instructor Preparation
 
@@ -1292,113 +1428,343 @@ Step 7 covers the complete workshop management lifecycle, from pre-workshop prep
 
 #### 7.3.1: Create Real-Time Monitoring Dashboard
 
-1. **Create Instructor Dashboard Script**
-   Create `instructor-dashboard.py`:
-   ```python
-   import boto3
-   import json
-   from datetime import datetime, timedelta
-   import os
-   
-   def get_workshop_status():
-       """Get comprehensive workshop status"""
-       organizations = boto3.client('organizations')
-       budgets = boto3.client('budgets')
-       ce = boto3.client('ce')
-       
-       workshop_ou_id = os.environ.get('WORKSHOP_OU_ID')
-       
-       # Get all accounts
-       accounts = organizations.list_accounts_for_parent(
-           ParentId=workshop_ou_id
-       )
-       
-       # Get account details
-       account_status = []
-       total_cost = 0
-       
-       for account in accounts['Accounts']:
-           account_id = account['Id']
-           account_name = account['Name']
-           account_email = account['Email']
-           account_status_val = account['Status']
-           joined_date = account['JoinedTimestamp']
-           
-           # Get cost for this account
-           try:
-               end_date = datetime.now().strftime('%Y-%m-%d')
-               start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
-               
-               response = ce.get_cost_and_usage(
-                   TimePeriod={'Start': start_date, 'End': end_date},
-                   Granularity='MONTHLY',
-                   Metrics=['BlendedCost'],
-                   Filter={
-                       'Dimensions': {
-                           'Key': 'LINKED_ACCOUNT',
-                           'Values': [account_id]
-                       }
-                   }
-               )
-               
-               cost = float(response['ResultsByTime'][0]['Total']['BlendedCost']['Amount'])
-               total_cost += cost
-               
-           except Exception as e:
-               cost = 0
-               print(f"Error getting cost for {account_id}: {e}")
-           
-           account_status.append({
-               'account_id': account_id,
-               'name': account_name,
-               'email': account_email,
-               'status': account_status_val,
-               'joined_date': joined_date.isoformat(),
-               'cost': cost,
-               'cost_status': 'WARNING' if cost > 15 else 'OK'
-           })
-       
-       return {
-           'workshop_info': {
-               'total_accounts': len(accounts['Accounts']),
-               'active_accounts': len([a for a in account_status if a['status'] == 'ACTIVE']),
-               'total_cost': total_cost,
-               'last_updated': datetime.now().isoformat()
-           },
-           'accounts': account_status
-       }
-   
-   def generate_workshop_report():
-       """Generate comprehensive workshop report"""
-       status = get_workshop_status()
-       
-       report = f"""
-   # Workshop Status Report
-   Generated: {status['workshop_info']['last_updated']}
-   
-   ## Summary
-   - Total Accounts: {status['workshop_info']['total_accounts']}
-   - Active Accounts: {status['workshop_info']['active_accounts']}
-   - Total Cost: ${status['workshop_info']['total_cost']:.2f}
-   
-   ## Account Details
-   """
-       
-       for account in status['accounts']:
-           report += f"""
-   ### {account['name']} ({account['email']})
-   - Account ID: {account['account_id']}
-   - Status: {account['status']}
-   - Cost: ${account['cost']:.2f} ({account['cost_status']})
-   - Joined: {account['joined_date']}
-   """
-       
-       return report
-   
-   if __name__ == "__main__":
-       status = get_workshop_status()
-       print(json.dumps(status, indent=2))
-   ```
+**Step 1: Create Instructor Dashboard Backend API**
+
+```bash
+# Create Lambda function for instructor dashboard
+cat > instructor-dashboard-lambda.py << 'EOF'
+import json
+import boto3
+from datetime import datetime, timedelta
+import os
+
+def lambda_handler(event, context):
+    """Lambda handler for instructor dashboard API"""
+    try:
+        # Get workshop status
+        status = get_workshop_status()
+        
+        return {
+            'statusCode': 200,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type'
+            },
+            'body': json.dumps(status)
+        }
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            'body': json.dumps({'error': str(e)})
+        }
+
+def get_workshop_status():
+    """Get comprehensive workshop status"""
+    organizations = boto3.client('organizations')
+    ce = boto3.client('ce')
+    
+    workshop_ou_id = os.environ.get('WORKSHOP_OU_ID', 'ou-01dw-2r1xz8cp')
+    
+    # Get all accounts
+    accounts = organizations.list_accounts_for_parent(
+        ParentId=workshop_ou_id
+    )
+    
+    # Get account details
+    account_status = []
+    total_cost = 0
+    
+    for account in accounts['Accounts']:
+        account_id = account['Id']
+        account_name = account['Name']
+        account_email = account['Email']
+        account_status_val = account['Status']
+        joined_date = account['JoinedTimestamp']
+        
+        # Get cost for this account
+        try:
+            end_date = datetime.now().strftime('%Y-%m-%d')
+            start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+            
+            response = ce.get_cost_and_usage(
+                TimePeriod={'Start': start_date, 'End': end_date},
+                Granularity='MONTHLY',
+                Metrics=['BlendedCost'],
+                Filter={
+                    'Dimensions': {
+                        'Key': 'LINKED_ACCOUNT',
+                        'Values': [account_id]
+                    }
+                }
+            )
+            
+            cost = float(response['ResultsByTime'][0]['Total']['BlendedCost']['Amount'])
+            total_cost += cost
+            
+        except Exception as e:
+            cost = 0
+            print(f"Error getting cost for {account_id}: {e}")
+        
+        account_status.append({
+            'account_id': account_id,
+            'name': account_name,
+            'email': account_email,
+            'status': account_status_val,
+            'joined_date': joined_date.isoformat(),
+            'cost': cost,
+            'cost_status': 'WARNING' if cost > 15 else 'OK'
+        })
+    
+    return {
+        'workshop_info': {
+            'total_accounts': len(accounts['Accounts']),
+            'active_accounts': len([a for a in account_status if a['status'] == 'ACTIVE']),
+            'total_cost': total_cost,
+            'last_updated': datetime.now().isoformat()
+        },
+        'accounts': account_status
+    }
+EOF
+
+# Create deployment package
+zip instructor-dashboard-lambda.zip instructor-dashboard-lambda.py
+
+# Create Lambda function
+aws lambda create-function \
+  --function-name instructor-dashboard-api \
+  --runtime python3.9 \
+  --role arn:aws:iam::535002854646:role/PA-Consulting-Infrastructure-Wo-AccountCreationRole-SH8cjx5sCx5Z \
+  --handler instructor-dashboard-lambda.lambda_handler \
+  --zip-file fileb://instructor-dashboard-lambda.zip \
+  --timeout 30 \
+  --memory-size 256 \
+  --environment Variables='{WORKSHOP_OU_ID=ou-01dw-2r1xz8cp}'
+```
+
+**Step 2: Create API Gateway for Instructor Dashboard**
+
+```bash
+# Create API Gateway for instructor dashboard
+aws apigateway create-rest-api \
+  --name "instructor-dashboard-api" \
+  --description "Instructor dashboard API for workshop management"
+
+# Get the API ID (replace with actual ID from response)
+export DASHBOARD_API_ID="YOUR_DASHBOARD_API_ID"
+
+# Get root resource ID
+aws apigateway get-resources --rest-api-id $DASHBOARD_API_ID
+
+# Create dashboard resource
+aws apigateway create-resource \
+  --rest-api-id $DASHBOARD_API_ID \
+  --parent-id ROOT_RESOURCE_ID \
+  --path-part "dashboard"
+
+# Create GET method
+aws apigateway put-method \
+  --rest-api-id $DASHBOARD_API_ID \
+  --resource-id DASHBOARD_RESOURCE_ID \
+  --http-method GET \
+  --authorization-type NONE
+
+# Set up Lambda integration
+aws apigateway put-integration \
+  --rest-api-id $DASHBOARD_API_ID \
+  --resource-id DASHBOARD_RESOURCE_ID \
+  --http-method GET \
+  --type AWS_PROXY \
+  --integration-http-method POST \
+  --uri "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:535002854646:function:instructor-dashboard-api/invocations"
+
+# Deploy the API
+aws apigateway create-deployment \
+  --rest-api-id $DASHBOARD_API_ID \
+  --stage-name "prod"
+
+# Add Lambda permission
+aws lambda add-permission \
+  --function-name instructor-dashboard-api \
+  --statement-id apigateway-dashboard-invoke \
+  --action lambda:InvokeFunction \
+  --principal apigateway.amazonaws.com \
+  --source-arn "arn:aws:execute-api:us-east-1:535002854646:$DASHBOARD_API_ID/*/*"
+```
+
+**Step 3: Create Instructor Dashboard Web Interface**
+
+```bash
+# Create instructor dashboard HTML
+cat > instructor-dashboard.html << 'EOF'
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Workshop Instructor Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f7fa; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .card { background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .metric { font-size: 2.5em; font-weight: bold; color: #667eea; margin-bottom: 10px; }
+        .metric-label { color: #666; font-size: 1.1em; }
+        .warning { color: #ff6b35; }
+        .ok { color: #28a745; }
+        .accounts-table { background: white; border-radius: 10px; padding: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; font-weight: 600; color: #333; }
+        .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.9em; font-weight: 500; }
+        .status-active { background: #d4edda; color: #155724; }
+        .status-pending { background: #fff3cd; color: #856404; }
+        .cost-warning { background: #f8d7da; color: #721c24; }
+        .cost-ok { background: #d4edda; color: #155724; }
+        .refresh-btn { background: #667eea; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-bottom: 20px; }
+        .refresh-btn:hover { background: #5a6fd8; }
+        .loading { text-align: center; color: #667eea; font-size: 1.2em; }
+        .error { background: #f8d7da; color: #721c24; padding: 15px; border-radius: 5px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎓 Workshop Instructor Dashboard</h1>
+        <p>Infrastructure Workshop 2025 - Real-time Management</p>
+    </div>
+    
+    <div class="container">
+        <button class="refresh-btn" onclick="refreshData()">🔄 Refresh Data</button>
+        
+        <div class="dashboard">
+            <div class="card">
+                <div class="metric" id="totalAccounts">-</div>
+                <div class="metric-label">Total Student Accounts</div>
+            </div>
+            <div class="card">
+                <div class="metric" id="activeAccounts">-</div>
+                <div class="metric-label">Active Accounts</div>
+            </div>
+            <div class="card">
+                <div class="metric" id="totalCost">-</div>
+                <div class="metric-label">Total Cost ($)</div>
+            </div>
+            <div class="card">
+                <div class="metric" id="lastUpdated">-</div>
+                <div class="metric-label">Last Updated</div>
+            </div>
+        </div>
+        
+        <div class="accounts-table">
+            <h2>📋 Student Accounts</h2>
+            <div id="loadingMessage" class="loading">Loading student data...</div>
+            <div id="errorMessage" class="error" style="display: none;"></div>
+            <table id="accountsTable" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Account ID</th>
+                        <th>Status</th>
+                        <th>Cost</th>
+                        <th>Joined</th>
+                    </tr>
+                </thead>
+                <tbody id="accountsBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const DASHBOARD_API_URL = 'https://YOUR_DASHBOARD_API_ID.execute-api.us-east-1.amazonaws.com/prod/dashboard';
+        
+        async function refreshData() {
+            const loadingDiv = document.getElementById('loadingMessage');
+            const errorDiv = document.getElementById('errorMessage');
+            const tableDiv = document.getElementById('accountsTable');
+            
+            loadingDiv.style.display = 'block';
+            errorDiv.style.display = 'none';
+            tableDiv.style.display = 'none';
+            
+            try {
+                const response = await fetch(DASHBOARD_API_URL);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    updateDashboard(data);
+                    loadingDiv.style.display = 'none';
+                    tableDiv.style.display = 'table';
+                } else {
+                    throw new Error(data.error || 'Failed to fetch data');
+                }
+            } catch (error) {
+                loadingDiv.style.display = 'none';
+                errorDiv.style.display = 'block';
+                errorDiv.textContent = 'Error: ' + error.message;
+            }
+        }
+        
+        function updateDashboard(data) {
+            // Update metrics
+            document.getElementById('totalAccounts').textContent = data.workshop_info.total_accounts;
+            document.getElementById('activeAccounts').textContent = data.workshop_info.active_accounts;
+            document.getElementById('totalCost').textContent = '$' + data.workshop_info.total_cost.toFixed(2);
+            document.getElementById('lastUpdated').textContent = new Date(data.workshop_info.last_updated).toLocaleTimeString();
+            
+            // Update accounts table
+            const tbody = document.getElementById('accountsBody');
+            tbody.innerHTML = '';
+            
+            data.accounts.forEach(account => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td>${account.name}</td>
+                    <td>${account.email}</td>
+                    <td><code>${account.account_id}</code></td>
+                    <td><span class="status-badge status-${account.status.toLowerCase()}">${account.status}</span></td>
+                    <td><span class="status-badge ${account.cost_status.toLowerCase().replace('ok', 'cost-ok')}">$${account.cost.toFixed(2)}</span></td>
+                    <td>${new Date(account.joined_date).toLocaleDateString()}</td>
+                `;
+            });
+        }
+        
+        // Auto-refresh every 30 seconds
+        setInterval(refreshData, 30000);
+        
+        // Initial load
+        refreshData();
+    </script>
+</body>
+</html>
+EOF
+```
+
+**Step 4: Deploy Instructor Dashboard**
+
+```bash
+# Upload instructor dashboard to S3
+aws s3 cp instructor-dashboard.html s3://$WORKSHOP_BUCKET/instructor-dashboard.html --content-type "text/html"
+
+# Get instructor dashboard URL
+echo "Instructor Dashboard URL: http://$WORKSHOP_BUCKET.s3-website-us-east-1.amazonaws.com/instructor-dashboard.html"
+```
+
+**Step 5: Test Instructor Dashboard**
+
+```bash
+# Test the dashboard API
+curl https://YOUR_DASHBOARD_API_ID.execute-api.us-east-1.amazonaws.com/prod/dashboard
+
+# Test the dashboard webpage
+curl -I http://$WORKSHOP_BUCKET.s3-website-us-east-1.amazonaws.com/instructor-dashboard.html
+```
 
 ### Step 7.4: Real-Time Workshop Monitoring
 
@@ -1656,6 +2022,222 @@ Step 7 covers the complete workshop management lifecycle, from pre-workshop prep
 
 #### 7.7.1: Complete Workshop Checklist
 
+**Step 1: Test End-to-End Registration Flow**
+
+```bash
+# Test student registration via API
+curl -X POST \
+  https://5ag5k2p4aa.execute-api.us-east-1.amazonaws.com/prod/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"final-test@example.com","name":"Final Test User","studentId":"99999"}'
+
+# Verify account creation in Organizations
+aws organizations list-accounts --query 'Accounts[?Email==`final-test@example.com`]'
+
+# Check account status
+aws organizations describe-account --account-id ACCOUNT_ID_FROM_ABOVE
+```
+
+**Step 2: Test Instructor Dashboard**
+
+```bash
+# Test dashboard API (replace with actual API ID)
+curl https://YOUR_DASHBOARD_API_ID.execute-api.us-east-1.amazonaws.com/prod/dashboard
+
+# Test dashboard webpage
+curl -I http://$WORKSHOP_BUCKET.s3-website-us-east-1.amazonaws.com/instructor-dashboard.html
+```
+
+**Step 3: Test Support System**
+
+```bash
+# Test support request
+curl -X POST \
+  https://YOUR_SUPPORT_API_ID.execute-api.us-east-1.amazonaws.com/prod/support \
+  -H "Content-Type: application/json" \
+  -d '{"email":"final-test@example.com","issue_type":"account_access"}'
+
+# Test troubleshooting script
+python3 troubleshoot-account.py final-test@example.com
+```
+
+**Step 4: Test Monitoring and Alerts**
+
+```bash
+# Test activity monitoring
+python3 activity-monitor.py
+
+# Test monitoring Lambda
+aws lambda invoke \
+  --function-name workshop-activity-monitor \
+  --payload '{}' \
+  monitoring-test.json
+
+cat monitoring-test.json
+```
+
+**Step 5: Test Cleanup and Reporting**
+
+```bash
+# Test final report generation
+python3 final-report-generator.py
+
+# Test cleanup script
+python3 workshop-cleanup.py
+
+# Test cleanup Lambda
+aws lambda invoke \
+  --function-name workshop-cleanup \
+  --payload '{}' \
+  cleanup-test.json
+
+cat cleanup-test.json
+```
+
+**Step 6: Comprehensive Verification Checklist**
+
+```bash
+# Create verification script
+cat > verify-workshop-setup.sh << 'EOF'
+#!/bin/bash
+
+echo "🔍 Workshop Setup Verification"
+echo "=============================="
+
+# Check Lambda functions
+echo "1. Checking Lambda functions..."
+aws lambda list-functions --query 'Functions[?contains(FunctionName, `workshop`) || contains(FunctionName, `infrastructure`)].FunctionName' --output table
+
+# Check API Gateways
+echo -e "\n2. Checking API Gateways..."
+aws apigateway get-rest-apis --query 'items[?contains(name, `workshop`) || contains(name, `instructor`)].{Name:name,Id:id}' --output table
+
+# Check S3 buckets
+echo -e "\n3. Checking S3 buckets..."
+aws s3 ls | grep workshop
+
+# Check Organizations OU
+echo -e "\n4. Checking Organizations OU..."
+aws organizations list-organizational-units-for-parent --parent-id r-$(aws organizations list-roots --query 'Roots[0].Id' --output text | cut -d'-' -f2)
+
+# Check SES configuration
+echo -e "\n5. Checking SES configuration..."
+aws ses get-identity-verification-attributes --identities conor.macklin1986@gmail.com
+
+# Check CloudWatch alarms
+echo -e "\n6. Checking CloudWatch alarms..."
+aws cloudwatch describe-alarms --alarm-names workshop-activity-monitor workshop-account-creation-errors
+
+# Check SNS topics
+echo -e "\n7. Checking SNS topics..."
+aws sns list-topics --query 'Topics[?contains(TopicArn, `workshop`)]'
+
+echo -e "\n✅ Verification complete!"
+EOF
+
+chmod +x verify-workshop-setup.sh
+./verify-workshop-setup.sh
+```
+
+**Step 7: Final System Status Check**
+
+```bash
+# Create final status report
+cat > final-status-check.py << 'EOF'
+import boto3
+import json
+from datetime import datetime
+
+def check_system_status():
+    """Check overall system status"""
+    status = {
+        'timestamp': datetime.now().isoformat(),
+        'components': {},
+        'overall_status': 'UNKNOWN'
+    }
+    
+    # Check Lambda functions
+    try:
+        lambda_client = boto3.client('lambda')
+        functions = lambda_client.list_functions()
+        workshop_functions = [f for f in functions['Functions'] if 'workshop' in f['FunctionName'] or 'infrastructure' in f['FunctionName']]
+        status['components']['lambda_functions'] = {
+            'status': 'OK' if len(workshop_functions) >= 3 else 'WARNING',
+            'count': len(workshop_functions),
+            'functions': [f['FunctionName'] for f in workshop_functions]
+        }
+    except Exception as e:
+        status['components']['lambda_functions'] = {'status': 'ERROR', 'error': str(e)}
+    
+    # Check API Gateways
+    try:
+        apigw_client = boto3.client('apigateway')
+        apis = apigw_client.get_rest_apis()
+        workshop_apis = [api for api in apis['items'] if 'workshop' in api['name'] or 'instructor' in api['name']]
+        status['components']['api_gateways'] = {
+            'status': 'OK' if len(workshop_apis) >= 2 else 'WARNING',
+            'count': len(workshop_apis),
+            'apis': [api['name'] for api in workshop_apis]
+        }
+    except Exception as e:
+        status['components']['api_gateways'] = {'status': 'ERROR', 'error': str(e)}
+    
+    # Check S3 buckets
+    try:
+        s3_client = boto3.client('s3')
+        buckets = s3_client.list_buckets()
+        workshop_buckets = [b for b in buckets['Buckets'] if 'workshop' in b['Name']]
+        status['components']['s3_buckets'] = {
+            'status': 'OK' if len(workshop_buckets) >= 1 else 'WARNING',
+            'count': len(workshop_buckets),
+            'buckets': [b['Name'] for b in workshop_buckets]
+        }
+    except Exception as e:
+        status['components']['s3_buckets'] = {'status': 'ERROR', 'error': str(e)}
+    
+    # Determine overall status
+    component_statuses = [comp['status'] for comp in status['components'].values()]
+    if all(status == 'OK' for status in component_statuses):
+        status['overall_status'] = 'HEALTHY'
+    elif any(status == 'ERROR' for status in component_statuses):
+        status['overall_status'] = 'ERROR'
+    else:
+        status['overall_status'] = 'WARNING'
+    
+    return status
+
+if __name__ == "__main__":
+    status = check_system_status()
+    print(json.dumps(status, indent=2))
+EOF
+
+python3 final-status-check.py
+```
+
+**Step 8: Workshop Ready Confirmation**
+
+```bash
+echo "🎉 WORKSHOP SETUP COMPLETE! 🎉"
+echo "==============================="
+echo ""
+echo "✅ Student Registration: http://$WORKSHOP_BUCKET.s3-website-us-east-1.amazonaws.com"
+echo "✅ Instructor Dashboard: http://$WORKSHOP_BUCKET.s3-website-us-east-1.amazonaws.com/instructor-dashboard.html"
+echo "✅ Support System: http://$WORKSHOP_BUCKET.s3-website-us-east-1.amazonaws.com/support-request.html"
+echo ""
+echo "📋 Next Steps:"
+echo "1. Share registration URL with students"
+echo "2. Monitor via instructor dashboard"
+echo "3. Use support system for troubleshooting"
+echo "4. Run cleanup scripts after workshop completion"
+echo ""
+echo "🔧 Management Commands:"
+echo "- Monitor activity: python3 activity-monitor.py"
+echo "- Generate report: python3 final-report-generator.py"
+echo "- Run cleanup: python3 workshop-cleanup.py"
+echo "- Check status: python3 final-status-check.py"
+```
+
+**Complete Workshop Checklist:**
 - [ ] All student accounts created successfully
 - [ ] Welcome emails delivered
 - [ ] Budgets and monitoring configured
