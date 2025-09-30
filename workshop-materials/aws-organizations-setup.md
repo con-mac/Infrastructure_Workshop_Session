@@ -1342,42 +1342,306 @@ If you want to monitor registrations, you can use the existing `cost-monitoring.
      - **Value:** `ou-01dw-2r1xz8cp`
    - Click "Save"
 
-5. **Update Function Role**
+5. **Update Function Role (CRITICAL STEP)**
    - Go to "Configuration" tab
    - Click "Permissions"
-   - Click on the execution role name
+   - Click on the execution role name (it will be something like `instructor-dashboard-api-role-xxxxx`)
    - This will open IAM in a new tab
-   - Add the same permissions as your account creation function
-import json
-import boto3
-from datetime import datetime, timedelta
-import os
+   - Click "Add permissions" → "Attach policies"
+   - Search for and select: `PA-Consulting-Infrastructure-Wo-AccountCreationRole-SH8cjx5sCx5Z`
+   - Click "Attach policy"
+   - **OR** if you can't find that policy, add this custom policy:
+     - Click "Add permissions" → "Create inline policy"
+     - Click "JSON" tab
+     - Paste this policy:
+     ```json
+     {
+         "Version": "2012-10-17",
+         "Statement": [
+             {
+                 "Effect": "Allow",
+                 "Action": [
+                     "organizations:*",
+                     "identitystore:*",
+                     "ses:SendEmail",
+                     "ses:SendRawEmail",
+                     "budgets:*",
+                     "s3:GetObject",
+                     "s3:PutObject"
+                 ],
+                 "Resource": "*"
+             }
+         ]
+     }
+     ```
+     - Click "Next"
+     - Name it: `InstructorDashboardPolicy`
+     - Click "Create policy"
 
-def lambda_handler(event, context):
-    """Lambda handler for instructor dashboard API"""
-    try:
-        # Get workshop status
-        status = get_workshop_status()
-        
-        return {
-            'statusCode': 200,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type'
-            },
-            'body': json.dumps(status)
-        }
-    except Exception as e:
-        return {
-            'statusCode': 500,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
-            'body': json.dumps({'error': str(e)})
-        }
+6. **Test the Function**
+   - Go back to Lambda console
+   - Click "Test" button
+   - Create a new test event with this JSON:
+   ```json
+   {}
+   ```
+   - Name it: `TestDashboard`
+   - Click "Create"
+   - Click "Test" button
+   - You should see a successful response with workshop data
+
+#### 7.3.2: Create API Gateway for Dashboard
+
+**Step 1: Create API Gateway**
+
+1. **Go to API Gateway Console**
+   - Navigate to AWS Console → Services → API Gateway
+   - Click "Create API"
+   - Select "REST API"
+   - Click "Build"
+
+2. **Configure API**
+   - **API name:** `instructor-dashboard-api`
+   - **Description:** `API for instructor dashboard data`
+   - **Endpoint Type:** Regional
+   - Click "Create API"
+
+3. **Create Resource**
+   - Click "Actions" → "Create Resource"
+   - **Resource Name:** `dashboard`
+   - **Resource Path:** `dashboard`
+   - **Enable CORS:** Check this box
+   - Click "Create Resource"
+
+4. **Create Method**
+   - Select the `/dashboard` resource
+   - Click "Actions" → "Create Method"
+   - Select "GET" from dropdown
+   - Click the checkmark
+
+5. **Configure Method**
+   - **Integration type:** Lambda Function
+   - **Use Lambda Proxy integration:** Check this box
+   - **Lambda Function:** `instructor-dashboard-api`
+   - **Use Default Timeout:** Check this box
+   - Click "Save"
+   - Click "OK" when prompted to add Lambda permissions
+
+**Step 2: Deploy API**
+
+1. **Deploy API**
+   - Click "Actions" → "Deploy API"
+   - **Deployment stage:** `[New Stage]`
+   - **Stage name:** `prod`
+   - **Stage description:** `Production stage for instructor dashboard`
+   - Click "Deploy"
+
+2. **Get API Endpoint**
+   - Note the "Invoke URL" (e.g., `https://abc123.execute-api.us-east-1.amazonaws.com/prod`)
+   - Your dashboard API will be at: `[INVOKE_URL]/dashboard`
+
+**Step 3: Test API Gateway**
+
+1. **Test the Endpoint**
+   - Click on the `/dashboard` resource
+   - Click "GET" method
+   - Click "Test"
+   - Click "Test" button
+   - You should see workshop data returned
+
+2. **Test from Browser**
+   - Open a new browser tab
+   - Go to: `[YOUR_API_GATEWAY_URL]/dashboard`
+   - You should see JSON data with workshop information
+
+### Step 7.4: Monitoring and Alerts Setup
+
+#### 7.4.1: CloudWatch Dashboard
+
+**Step 1: Create CloudWatch Dashboard**
+
+1. **Go to CloudWatch Console**
+   - Navigate to AWS Console → Services → CloudWatch
+   - Click "Dashboards" in the left menu
+   - Click "Create dashboard"
+
+2. **Configure Dashboard**
+   - **Dashboard name:** `workshop-monitoring`
+   - **Description:** `Workshop infrastructure monitoring`
+   - Click "Create dashboard"
+
+3. **Add Lambda Metrics Widget**
+   - Click "Add widget"
+   - Select "Line chart"
+   - **Metrics:** Lambda → By Function Name → `infrastructure-workshop-2025-account-creation`
+   - **Metric:** Invocations, Errors, Duration
+   - Click "Create widget"
+
+4. **Add API Gateway Metrics Widget**
+   - Click "Add widget"
+   - Select "Line chart"
+   - **Metrics:** API Gateway → By API Name → `workshop-api`
+   - **Metric:** Count, 4XXError, 5XXError
+   - Click "Create widget"
+
+#### 7.4.2: Set Up Alerts
+
+**Step 1: Create CloudWatch Alarms**
+
+1. **Go to CloudWatch Alarms**
+   - In CloudWatch console, click "Alarms" in the left menu
+   - Click "Create alarm"
+
+2. **Create Lambda Error Alarm**
+   - Click "Select metric"
+   - **Service:** Lambda
+   - **Metric:** Errors
+   - **Function name:** `infrastructure-workshop-2025-account-creation`
+   - Click "Select metric"
+   - **Threshold:** Greater than 0
+   - **Datapoints:** 1 out of 1
+   - **Period:** 1 minute
+   - Click "Next"
+
+3. **Configure Alarm Actions**
+   - **Alarm name:** `workshop-lambda-errors`
+   - **Alarm description:** `Lambda function errors detected`
+   - **SNS topic:** Create new topic
+   - **Topic name:** `workshop-alerts`
+   - **Email endpoints:** Your email address
+   - Click "Create alarm"
+
+### Step 7.5: Support and Troubleshooting
+
+#### 7.5.1: Create Support Documentation
+
+**Step 1: Create Troubleshooting Guide**
+
+1. **Go to S3 Console**
+   - Navigate to AWS Console → Services → S3
+   - Find your bucket: `infrastructure-workshop-2025-registration-{account-id}`
+   - Click "Upload"
+
+2. **Create Support HTML File**
+   - Create a new file called `support.html` with this content:
+   ```html
+   <!DOCTYPE html>
+   <html>
+   <head>
+       <meta charset="UTF-8">
+       <title>Workshop Support</title>
+       <style>
+           body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+           .issue { background: #f8f9fa; padding: 15px; margin: 10px 0; border-left: 4px solid #007cba; }
+           .solution { background: #d4edda; padding: 10px; margin: 5px 0; border-radius: 4px; }
+       </style>
+   </head>
+   <body>
+       <h1>Workshop Support Guide</h1>
+       
+       <div class="issue">
+           <h3>Registration Not Working</h3>
+           <div class="solution">
+               <p><strong>Check:</strong> API Gateway endpoint is correct</p>
+               <p><strong>Check:</strong> Lambda function has proper permissions</p>
+               <p><strong>Check:</strong> SES is verified for your email domain</p>
+           </div>
+       </div>
+       
+       <div class="issue">
+           <h3>Account Creation Failing</h3>
+           <div class="solution">
+               <p><strong>Check:</strong> Organizations permissions</p>
+               <p><strong>Check:</strong> Workshop OU ID is correct</p>
+               <p><strong>Check:</strong> Budget limits are set</p>
+           </div>
+       </div>
+   </body>
+   </html>
+   ```
+   - Upload as `support.html`
+
+### Step 7.6: Cleanup and Maintenance
+
+#### 7.6.1: Automated Cleanup Script
+
+**Step 1: Create Cleanup Lambda Function**
+
+1. **Go to Lambda Console**
+   - Navigate to AWS Console → Services → Lambda
+   - Click "Create function"
+   - **Function name:** `workshop-cleanup`
+   - **Runtime:** Python 3.9
+   - Click "Create function"
+
+2. **Add Cleanup Code**
+   - In the "Code" tab, replace the code with:
+   ```python
+   import json
+   import boto3
+   from datetime import datetime, timedelta
+   
+   def lambda_handler(event, context):
+       """Clean up workshop resources"""
+       try:
+           # Add cleanup logic here
+           return {
+               'statusCode': 200,
+               'body': json.dumps({'message': 'Cleanup completed'})
+           }
+       except Exception as e:
+           return {
+               'statusCode': 500,
+               'body': json.dumps({'error': str(e)})
+           }
+   ```
+   - Click "Deploy"
+
+### Step 7.7: Final Verification
+
+#### 7.7.1: End-to-End Testing
+
+**Step 1: Test Complete Workflow**
+
+1. **Test Student Registration**
+   - Go to your S3 website URL
+   - Fill out the registration form
+   - Submit and verify success message
+   - Check your email for welcome message
+
+2. **Test Instructor Dashboard**
+   - Go to your S3 website URL + `/instructor-dashboard.html`
+   - Verify dashboard loads with data
+   - Check that all metrics are displayed
+
+3. **Test API Endpoints**
+   - Test registration API: `[API_GATEWAY_URL]/register`
+   - Test dashboard API: `[API_GATEWAY_URL]/dashboard`
+   - Both should return JSON data
+
+**Step 2: Verify Monitoring**
+
+1. **Check CloudWatch Dashboard**
+   - Go to CloudWatch → Dashboards
+   - Open `workshop-monitoring`
+   - Verify metrics are being collected
+
+2. **Check Alarms**
+   - Go to CloudWatch → Alarms
+   - Verify alarms are in "OK" state
+   - Test alarm by triggering an error
+
+**Step 3: Document Everything**
+
+1. **Update Documentation**
+   - Note all API Gateway URLs
+   - Document any custom configurations
+   - Save all important IDs and endpoints
+
+2. **Create Runbook**
+   - Document common issues and solutions
+   - Create escalation procedures
+   - Save all contact information
 
 def get_workshop_status():
     """Get comprehensive workshop status"""
