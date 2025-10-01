@@ -71,27 +71,45 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if not account_result['success']:
             return create_response(500, {'error': account_result['error']})
         
-        # Get the account ID from the create request
+        # Get the create request ID
         create_request_id = account_result['create_account_request_id']
-        
-        # Wait for account to be created (this is necessary to get the account ID)
-        # Note: This simplified version returns immediately but logs the request ID
-        # In a production system, you'd use an async workflow or Step Functions
         logger.info(f"Account creation request initiated: {create_request_id}")
         
-        # Return success immediately (account creation happens asynchronously)
-        return create_response(200, {
-            'message': 'Account creation initiated successfully',
-            'create_account_request_id': create_request_id,
-            'email': email,
-            'name': name,
-            'workshop_info': {
-                'name': WORKSHOP_NAME,
-                'duration_days': WORKSHOP_DURATION_DAYS,
-                'budget_limit': BUDGET_LIMIT
-            },
-            'note': 'Your account is being created. This may take 5-10 minutes. You will receive an email when ready.'
-        })
+        # Wait for account to be created and get the account ID
+        max_wait = 300  # 5 minutes
+        wait_interval = 10  # 10 seconds
+        account_id = None
+        
+        for _ in range(max_wait // wait_interval):
+            try:
+                response = organizations.describe_create_account_status(
+                    CreateAccountRequestId=create_request_id
+                )
+                status = response['CreateAccountStatus']['State']
+                
+                if status == 'SUCCEEDED':
+                    account_id = response['CreateAccountStatus']['AccountId']
+                    logger.info(f"Account created successfully: {account_id}")
+                    break
+                elif status == 'FAILED':
+                    failure_reason = response['CreateAccountStatus'].get('FailureReason', 'Unknown')
+                    logger.error(f"Account creation failed: {failure_reason}")
+                    return create_response(500, {'error': f'Account creation failed: {failure_reason}'})
+                
+                # Still in progress, wait
+                time.sleep(wait_interval)
+                
+            except Exception as e:
+                logger.error(f"Error checking account status: {str(e)}")
+                time.sleep(wait_interval)
+        
+        if not account_id:
+            return create_response(500, {'error': 'Account creation timed out. Please contact support.'})
+        
+        # Move account to workshop OU
+        move_result = move_account_to_workshop_ou(account_id)
+        if not move_result:
+            logger.warning(f"Failed to move account {account_id} to workshop OU")
         
         # Create IAM Identity Center user
         user_result = create_sso_user(email, name)
