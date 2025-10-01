@@ -527,7 +527,7 @@
                     <td>$${(student.cost || 0).toFixed(2)}</td>
                     <td>
                         <button class="btn" onclick="viewStudentDetails('${student.email}')" style="padding: 5px 10px; font-size: 12px;">View</button>
-                        <button class="btn danger" onclick="deleteStudent('${student.email}')" style="padding: 5px 10px; font-size: 12px;">Delete</button>
+                        <!-- Delete disabled - use AWS Console to close accounts -->
                     </td>
                 `;
                 tbody.appendChild(row);
