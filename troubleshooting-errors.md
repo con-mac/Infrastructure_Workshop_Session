@@ -256,3 +256,75 @@ The file is 26KB vs index.html's 5.2KB. While this shouldn't be an issue, let's 
 
 This will help us determine if the issue is with the filename itself.
 
+---
+
+### ⚠️ Test Result: Renaming Failed
+
+**Attempt 2: Renamed to dashboard.html**
+**Result:** ❌ Still getting 403 Access Denied
+
+**This eliminates filename as the issue.**
+
+---
+
+### 🔍 New Discovery: Static Website Hosting Error Document
+
+The error message keeps mentioning:
+```
+An Error Occurred While Attempting to Retrieve a Custom Error Document
+Key: error.html
+```
+
+**This means:**
+1. S3 static website hosting is configured to use `error.html` as the error document
+2. When ANY file returns an error, S3 tries to serve `error.html`
+3. `error.html` doesn't exist, causing a secondary error
+
+**Critical Question:** Why is index.html working via website endpoint but dashboard.html isn't?
+
+---
+
+### 🎯 New Hypothesis: Index Document vs Regular Files
+
+**Observation:**
+- `index.html` works via website endpoint ✅
+- `dashboard.html` fails via website endpoint ❌
+- BOTH fail via object URL ❌
+
+**Possible Explanation:**
+The bucket might be configured to ONLY serve the index document (`index.html`) and not allow access to other files!
+
+---
+
+### 💡 Next Action: Check Static Website Hosting Configuration
+
+**Step 1: Verify Static Website Hosting Settings**
+
+In S3 Console → Properties → Static website hosting:
+1. What is the **exact configuration**?
+2. Is there a "Redirection rules" section with any rules?
+3. Is there a "Hosting type" set to "Redirect requests"?
+
+**Step 2: Test Root URL**
+
+Try accessing just the root:
+`http://infrastructure-workshop-2025-registration-535002854646.s3-website-us-east-1.amazonaws.com/`
+
+Does this work?
+
+**Step 3: Create error.html to Stop Secondary Error**
+
+Create a simple `error.html` and upload it to stop the confusing secondary error message.
+
+---
+
+### 🔧 Alternative Solution: Use CloudFront or Different Hosting
+
+If S3 static website hosting continues to have issues, we could:
+1. Use AWS CloudFront distribution
+2. Use AWS Amplify hosting
+3. Use a simple EC2 instance with nginx
+4. Host the dashboard differently from the registration page
+
+But first, let's understand why the static website hosting is behaving this way.
+
