@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Workshop Instructor Dashboard</title>
+    <!-- Version: 2.0 - Cache busting enabled -->
     <style>
         * {
             margin: 0;
@@ -468,8 +472,9 @@
             try {
                 showLoading(true);
                 
-                // Fetch student data
-                const response = await fetch(`${API_BASE_URL}/dashboard`);
+                // Fetch student data (with cache busting)
+                const cacheBuster = Date.now();
+                const response = await fetch(`${API_BASE_URL}/dashboard?t=${cacheBuster}`);
                 const data = await response.json();
                 
                 if (response.ok) {
