@@ -16,6 +16,7 @@ logger.setLevel(logging.INFO)
 # Initialize AWS clients
 organizations = boto3.client('organizations')
 sso_admin = boto3.client('sso-admin')
+identitystore = boto3.client('identitystore')
 ses = boto3.client('ses')
 budgets = boto3.client('budgets')
 cloudformation = boto3.client('cloudformation')
@@ -276,8 +277,8 @@ def create_sso_user(email: str, name: str) -> Dict[str, Any]:
         # Get identity store ID
         identity_store_id = get_identity_store_id()
         
-        # Create user
-        sso_admin.create_user(
+        # Create user using identitystore service
+        response = identitystore.create_user(
             IdentityStoreId=identity_store_id,
             UserName=email,
             DisplayName=name,
@@ -289,8 +290,8 @@ def create_sso_user(email: str, name: str) -> Dict[str, Any]:
             Emails=[{'Value': email, 'Primary': True}]
         )
         
-        logger.info(f"SSO user created for {email}")
-        return {'success': True}
+        logger.info(f"SSO user created for {email}: {response['UserId']}")
+        return {'success': True, 'user_id': response['UserId']}
         
     except Exception as e:
         logger.error(f"Error creating SSO user: {str(e)}")
@@ -499,6 +500,20 @@ def generate_temp_password() -> str:
     password = ''.join(secrets.choice(alphabet) for _ in range(12))
     return password
 
+def get_sso_portal_url() -> str:
+    """Get the SSO portal URL"""
+    try:
+        response = sso_admin.list_instances()
+        if response['Instances']:
+            instance_arn = response['Instances'][0]['InstanceArn']
+            # Extract the instance ID from the ARN
+            instance_id = instance_arn.split('/')[-1]
+            return f"https://{instance_id}.awsapps.com/start"
+        return "https://d-906628ee9a.awsapps.com/start"
+    except Exception as e:
+        logger.error(f"Error getting SSO portal URL: {str(e)}")
+        return "https://d-906628ee9a.awsapps.com/start"
+
 def get_workshop_ou_id() -> str:
     """Get the workshop OU ID"""
     try:
@@ -512,11 +527,11 @@ def get_workshop_ou_id() -> str:
 def get_identity_store_id() -> str:
     """Get IAM Identity Center store ID"""
     try:
-        response = sso_admin.list_identity_stores()
+        response = identitystore.list_identity_stores()
         return response['IdentityStores'][0]['IdentityStoreId']
     except Exception as e:
         logger.error(f"Error getting identity store ID: {str(e)}")
-        raise
+        return "d-906628ee9a"
 
 def log_registration(email: str, name: str, student_id: str, account_id: str) -> None:
     """Log successful registration"""
