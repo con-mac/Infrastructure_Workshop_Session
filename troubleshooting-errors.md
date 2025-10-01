@@ -328,3 +328,83 @@ If S3 static website hosting continues to have issues, we could:
 
 But first, let's understand why the static website hosting is behaving this way.
 
+---
+
+## Issue: Account Creation Not Completing
+
+### Problem Summary
+
+**Symptom:** Registration returns success message but accounts don't appear in Workshop-Students OU
+
+**Root Cause:** Lambda function has an early return statement that exits before completing account setup
+
+**CloudWatch Logs Show:**
+```
+[INFO] Account creation initiated for conor.macklin1986@gmail.com: car-8451a1f9cfdc45a093f11a71bda74857
+END RequestId: 948cf11f-bf38-403f-94e5-ea9db31fa0d0
+```
+
+**What's Happening:**
+1. ✅ Lambda function receives request
+2. ✅ Account creation is initiated (`organizations.create_account()`)
+3. ✅ Function returns success with create_request_id
+4. ❌ Function exits BEFORE moving account to Workshop-Students OU
+5. ❌ Function exits BEFORE creating SSO user
+6. ❌ Function exits BEFORE setting up budget
+7. ❌ Function exits BEFORE sending welcome email
+
+### Architecture Issue
+
+**The Fundamental Problem:**
+- `organizations.create_account()` is **asynchronous**
+- It returns a `create_request_id` immediately
+- But the actual account isn't ready for **5-10 minutes**
+- Lambda has a **max timeout of 15 minutes**
+- Waiting in Lambda is inefficient and may timeout
+
+**Current Code Structure:**
+```python
+Line 70: account_result = create_aws_account(email, name)  # Returns request ID
+Line 83: return create_response(200, {...})  # Returns immediately
+Line 96+: move_account_to_workshop_ou(account_id)  # NEVER EXECUTES (after return)
+```
+
+### Solution Options
+
+**Option 1: Remove Early Return (Simple but Inefficient)**
+- Remove the early return statement
+- Wait for account to be ready
+- Complete all setup in one Lambda execution
+- **Downside:** Users wait 5-10 minutes for response, Lambda may timeout
+
+**Option 2: Use AWS Step Functions (Production-Ready)**
+- Use Step Functions to orchestrate the workflow
+- Lambda initiates account creation
+- Step Functions wait for account to be ready
+- Subsequent steps move account, create SSO user, etc.
+- **Downside:** More complex, requires additional AWS service
+
+**Option 3: Use EventBridge + Second Lambda (Recommended)**
+- First Lambda: Creates account, returns immediately
+- EventBridge: Monitors Organizations events
+- Second Lambda: Triggered when account is ready, completes setup
+- **Downside:** Requires additional Lambda function
+
+**Option 4: Manual Completion (Quick Fix)**
+- Keep early return
+- Account is created in root organization
+- Manually move accounts to Workshop-Students OU periodically
+- Manually trigger budget/SSO setup
+- **Downside:** Manual work required
+
+### Recommended Immediate Fix
+
+For your workshop use case, **Option 1** is simplest:
+
+1. The Lambda function should complete ALL steps before returning
+2. Users see a loading message for 5-10 minutes
+3. Once account is ready, they get confirmation
+4. Everything is set up properly
+
+**Implementation:** Remove the early return and let the full flow complete.
+

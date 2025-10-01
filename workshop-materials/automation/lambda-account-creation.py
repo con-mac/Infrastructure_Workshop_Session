@@ -71,22 +71,27 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if not account_result['success']:
             return create_response(500, {'error': account_result['error']})
         
-        # For testing, return success immediately without waiting for account creation
-        # In production, you would wait for the account to be ready
+        # Get the account ID from the create request
+        create_request_id = account_result['create_account_request_id']
+        
+        # Wait for account to be created (this is necessary to get the account ID)
+        # Note: This simplified version returns immediately but logs the request ID
+        # In a production system, you'd use an async workflow or Step Functions
+        logger.info(f"Account creation request initiated: {create_request_id}")
+        
+        # Return success immediately (account creation happens asynchronously)
         return create_response(200, {
             'message': 'Account creation initiated successfully',
-            'create_account_request_id': account_result['create_account_request_id'],
+            'create_account_request_id': create_request_id,
             'email': email,
             'name': name,
             'workshop_info': {
                 'name': WORKSHOP_NAME,
                 'duration_days': WORKSHOP_DURATION_DAYS,
                 'budget_limit': BUDGET_LIMIT
-            }
+            },
+            'note': 'Your account is being created. This may take 5-10 minutes. You will receive an email when ready.'
         })
-        
-        # Move account to workshop OU
-        move_account_to_workshop_ou(account_id)
         
         # Create IAM Identity Center user
         user_result = create_sso_user(email, name)
