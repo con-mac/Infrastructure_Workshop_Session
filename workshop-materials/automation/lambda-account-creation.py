@@ -367,7 +367,7 @@ def send_welcome_email(email: str, name: str, account_id: str, temp_password: Op
         
         # Send email
         ses.send_email(
-            Source='workshop@yourdomain.com',  # Must be verified in SES
+            Source=os.environ.get('NOTIFICATION_EMAIL', 'conor.macklin1986@gmail.com'),  # Must be verified in SES
             Destination={'ToAddresses': [email]},
             Message={
                 'Subject': {'Data': subject},
