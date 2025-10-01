@@ -502,17 +502,7 @@ def generate_temp_password() -> str:
 
 def get_sso_portal_url() -> str:
     """Get the SSO portal URL"""
-    try:
-        response = sso_admin.list_instances()
-        if response['Instances']:
-            instance_arn = response['Instances'][0]['InstanceArn']
-            # Extract the instance ID from the ARN
-            instance_id = instance_arn.split('/')[-1]
-            return f"https://{instance_id}.awsapps.com/start"
-        return "https://d-906628ee9a.awsapps.com/start"
-    except Exception as e:
-        logger.error(f"Error getting SSO portal URL: {str(e)}")
-        return "https://d-906628ee9a.awsapps.com/start"
+    return "https://d-906628ee9a.awsapps.com/start"
 
 def get_workshop_ou_id() -> str:
     """Get the workshop OU ID"""
