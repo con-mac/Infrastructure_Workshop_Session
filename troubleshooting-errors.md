@@ -189,3 +189,70 @@ Since static website hosting is looking for `error.html`, create a simple one:
 
 Upload this as `error.html` to stop the secondary error.
 
+---
+
+### 🚨 CRITICAL FINDING
+
+**Test Result:** BOTH index.html and instructor-dashboard.html return Access Denied via S3 object URL
+
+**URLs Tested:**
+- `https://infrastructure-workshop-2025-registration-535002854646.s3.amazonaws.com/index.html` → ❌ Access Denied
+- `https://infrastructure-workshop-2025-registration-535002854646.s3.amazonaws.com/instructor-dashboard.html` → ❌ Access Denied
+
+**Conclusion:** The bucket policy is NOT working for S3 object URLs
+
+**However:**
+- ✅ index.html WORKS via S3 website endpoint: `http://...s3-website-us-east-1.amazonaws.com/index.html`
+- ❌ instructor-dashboard.html FAILS via S3 website endpoint: `http://...s3-website-us-east-1.amazonaws.com/instructor-dashboard.html`
+
+**This tells us:**
+1. The bucket policy works for static website hosting
+2. index.html is correctly configured for static website hosting
+3. instructor-dashboard.html has a specific issue preventing it from being served via static website hosting
+
+---
+
+### 🎯 New Investigation: File-Specific Issue
+
+**Hypothesis:** The instructor-dashboard.html file has a specific problem:
+- Wrong file encoding
+- File corruption during upload
+- File name has invisible characters
+- File size too large (26KB vs 5.2KB for index.html)
+
+**Next Systematic Steps:**
+
+#### Step 1: Check File Name for Hidden Characters
+In S3 Console:
+1. Click on `instructor-dashboard.html`
+2. Check the exact object key (might have spaces or special characters)
+3. Copy the exact key name
+
+#### Step 2: Rename the File to Something Simple
+1. In your local folder, rename `instructor-dashboard.html` to `dashboard.html`
+2. Upload as `dashboard.html`
+3. Test: `http://...s3-website-us-east-1.amazonaws.com/dashboard.html`
+
+#### Step 3: Check File Size Limits
+The file is 26KB vs index.html's 5.2KB. While this shouldn't be an issue, let's verify:
+1. Check if there are any size-based restrictions
+2. Try creating a minimal version of instructor-dashboard.html
+3. Upload and test
+
+#### Step 4: Check File Encoding
+1. Open instructor-dashboard.html in a text editor
+2. Save as UTF-8 without BOM
+3. Re-upload
+4. Test
+
+---
+
+### 💡 Immediate Action
+
+**Try renaming the file to `dashboard.html` and uploading:**
+1. Rename locally: `instructor-dashboard.html` → `dashboard.html`
+2. Upload to S3 as `dashboard.html`
+3. Test: `http://infrastructure-workshop-2025-registration-535002854646.s3-website-us-east-1.amazonaws.com/dashboard.html`
+
+This will help us determine if the issue is with the filename itself.
+
