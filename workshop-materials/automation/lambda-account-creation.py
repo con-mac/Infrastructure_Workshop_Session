@@ -191,7 +191,9 @@ def check_workshop_capacity() -> bool:
         workshop_ou_id = get_workshop_ou_id()
         response = organizations.list_accounts_for_parent(ParentId=workshop_ou_id)
         
-        current_count = len(response['Accounts'])
+        # Only count ACTIVE accounts (exclude SUSPENDED/closed accounts)
+        active_accounts = [acc for acc in response['Accounts'] if acc['Status'] == 'ACTIVE']
+        current_count = len(active_accounts)
         return current_count < MAX_STUDENTS
         
     except Exception as e:
