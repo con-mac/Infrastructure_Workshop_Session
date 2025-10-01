@@ -33,6 +33,10 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     try:
         logger.info(f"Received event: {json.dumps(event)}")
         
+        # Handle CORS preflight requests
+        if event.get('httpMethod') == 'OPTIONS':
+            return create_response(200, {'message': 'CORS preflight'})
+        
         # Parse request body
         if 'body' in event:
             body = json.loads(event['body'])

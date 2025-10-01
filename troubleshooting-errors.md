@@ -120,17 +120,72 @@ Date: 2025-09-30
 
 ---
 
-### 💡 Next Action
+### 💡 Actions Taken
 
-**Based on the current state, the most likely issue is:**
+#### Attempt 1: Re-upload instructor-dashboard.html
+**Result:** ❌ Still getting 403 Access Denied
 
-The file might have been uploaded with different metadata or there might be a caching issue. The best next step is:
+**Error Details:**
+```html
+<Code>AccessDenied</Code>
+<Message>Access Denied</Message>
+<Key>error.html</Key> (trying to load error.html which doesn't exist)
+```
 
-**Re-upload the instructor-dashboard.html file:**
-1. Delete it from S3
-2. Upload it fresh
-3. Make sure it uploads successfully
-4. Test immediately
+---
 
-If that doesn't work, we'll check the file metadata and encryption settings next.
+### 🔍 Current Hypothesis
+
+The 403 error is showing that S3 is trying to load `error.html` as a custom error document. This suggests:
+
+1. **The file itself might be returning an error** (404 or similar)
+2. **S3 static website hosting** is configured to use `error.html` for errors
+3. **But `error.html` doesn't exist**, causing a secondary error
+
+**This creates a cascade:**
+1. User tries to access `instructor-dashboard.html`
+2. S3 returns an error (possibly 404 - file not found)
+3. S3 tries to serve `error.html` as custom error page
+4. `error.html` doesn't exist
+5. User sees "Access Denied" + "NoSuchKey: error.html"
+
+---
+
+### 🎯 Next Action: Test File Existence
+
+**Step 1: Verify the file is actually accessible**
+
+Try accessing the file via the S3 object URL (not website endpoint):
+`https://infrastructure-workshop-2025-registration-535002854646.s3.amazonaws.com/instructor-dashboard.html`
+
+**Expected Results:**
+- If this works → File exists, issue is with static website hosting config
+- If this fails → File upload issue or encryption/metadata problem
+
+**Step 2: Compare with index.html**
+
+Try accessing index.html via S3 object URL:
+`https://infrastructure-workshop-2025-registration-535002854646.s3.amazonaws.com/index.html`
+
+**Compare the results** - if index.html works via object URL but instructor-dashboard.html doesn't, there's a file-specific issue.
+
+**Step 3: Create error.html**
+
+Since static website hosting is looking for `error.html`, create a simple one:
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Error</title>
+</head>
+<body>
+    <h1>Error</h1>
+    <p>Something went wrong. Please go back and try again.</p>
+</body>
+</html>
+```
+
+Upload this as `error.html` to stop the secondary error.
 
