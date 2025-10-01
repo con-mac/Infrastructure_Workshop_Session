@@ -362,7 +362,7 @@ def send_welcome_email(email: str, name: str, account_id: str, temp_password: Op
         subject = f"Welcome to {WORKSHOP_NAME}!"
         
         # Create email body
-        body_html = create_welcome_email_html(name, account_id, temp_password)
+        body_html = create_welcome_email_html(name, account_id, email, temp_password)
         body_text = create_welcome_email_text(name, account_id, temp_password)
         
         # Send email
@@ -385,8 +385,9 @@ def send_welcome_email(email: str, name: str, account_id: str, temp_password: Op
         logger.error(f"Error sending welcome email: {str(e)}")
         return {'success': False, 'error': str(e)}
 
-def create_welcome_email_html(name: str, account_id: str, temp_password: Optional[str] = None) -> str:
+def create_welcome_email_html(name: str, account_id: str, email: str, temp_password: Optional[str] = None) -> str:
     """Create HTML welcome email"""
+    sso_portal_url = get_sso_portal_url()
     return f"""
     <!DOCTYPE html>
     <html>
@@ -425,9 +426,10 @@ def create_welcome_email_html(name: str, account_id: str, temp_password: Optiona
                 
                 <h3>🔑 How to Access Your Account</h3>
                 <ol>
-                    <li>Go to: <a href="https://{account_id}.signin.aws.amazon.com/console">AWS Console</a></li>
-                    <li>Use your email address to log in</li>
-                    <li>Follow the prompts to set up your account</li>
+                    <li>Go to: <a href="{sso_portal_url}">SSO Portal</a></li>
+                    <li>Sign in with your email: {email}</li>
+                    <li>You'll see your AWS account listed</li>
+                    <li>Click on your account to access the AWS Console</li>
                 </ol>
                 
                 <div class="warning">
