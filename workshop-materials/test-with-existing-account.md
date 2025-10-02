@@ -44,44 +44,69 @@ Since we've hit the AWS Organizations account creation limit (5 per day), let's 
    - You should now be in the test account (not master account)
    - Note the Account ID for later use
 
-### Step 3: Deploy Lab Infrastructure (As Root User)
+### Step 3: Deploy Complete Lab Environment (As Root User)
 
 **You're now in the test account as root user (via OrganizationAccountAccessRole)**
 
-1. **Deploy CloudFormation Stack**
-   ```bash
-   aws cloudformation create-stack \
-     --stack-name "Student1-Lab-Infrastructure" \
-     --template-body file://workshop-materials/cloudformation/working-2-tier-app.yaml \
-     --capabilities CAPABILITY_IAM
-   ```
+#### 3.1 Automated Deployment (Recommended)
+```bash
+# Run the automated deployment script
+cd workshop-materials/automation
+./deploy-all-labs.sh
+```
 
-2. **Monitor deployment**
-   ```bash
-   aws cloudformation describe-stacks \
-     --stack-name "Student1-Lab-Infrastructure" \
-     --query 'Stacks[0].StackStatus'
-   ```
+**This script will:**
+- ✅ Deploy main infrastructure (`working-2-tier-app.yaml`)
+- ✅ Deploy ALL lab challenges (all .yaml files)
+- ✅ Monitor all deployments
+- ✅ Verify all resources
+- ✅ Generate summary report
+- ✅ Provide application URLs
 
-3. **Verify resources**
-   ```bash
-   # Check EC2 instances
-   aws ec2 describe-instances --query 'Reservations[*].Instances[*].[InstanceId,State.Name]'
-   
-   # Check RDS database
-   aws rds describe-db-instances --query 'DBInstances[*].[DBInstanceIdentifier,DBInstanceStatus]'
-   
-   # Check Load Balancer
-   aws elbv2 describe-load-balancers --query 'LoadBalancers[*].[LoadBalancerName,State.Code]'
-   ```
+#### 3.2 Manual Deployment (Alternative)
+If you prefer manual deployment:
 
-4. **Get Application URL**
-   ```bash
-   # Get Load Balancer DNS name
-   aws elbv2 describe-load-balancers \
-     --query 'LoadBalancers[0].DNSName' \
-     --output text
-   ```
+```bash
+# Deploy main infrastructure
+aws cloudformation create-stack \
+  --stack-name "Student1-Lab-Infrastructure" \
+  --template-body file://workshop-materials/cloudformation/working-2-tier-app.yaml \
+  --capabilities CAPABILITY_IAM
+
+# Deploy ALL lab challenges
+aws cloudformation create-stack \
+  --stack-name "iam-challenge" \
+  --template-body file://workshop-materials/cloudformation/iam-challenge.yaml
+
+aws cloudformation create-stack \
+  --stack-name "load-balancer-challenge" \
+  --template-body file://workshop-materials/cloudformation/load-balancer-challenge.yaml
+
+aws cloudformation create-stack \
+  --stack-name "nacl-challenge" \
+  --template-body file://workshop-materials/cloudformation/nacl-challenge.yaml
+
+aws cloudformation create-stack \
+  --stack-name "security-group-challenge" \
+  --template-body file://workshop-materials/cloudformation/security-group-challenge.yaml
+
+aws cloudformation create-stack \
+  --stack-name "blue-green-deployment" \
+  --template-body file://workshop-materials/cloudformation/blue-green-deployment.yaml
+```
+
+#### 3.3 Verify Deployment
+```bash
+# Check all stacks
+aws cloudformation list-stacks \
+  --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE \
+  --query 'StackSummaries[?contains(StackName, `Student1`) || contains(StackName, `challenge`) || contains(StackName, `blue-green`)].{Name:StackName,Status:StackStatus}'
+
+# Check resources
+aws ec2 describe-instances --query 'Reservations[*].Instances[*].[InstanceId,State.Name]'
+aws rds describe-db-instances --query 'DBInstances[*].[DBInstanceIdentifier,DBInstanceStatus]'
+aws elbv2 describe-load-balancers --query 'LoadBalancers[*].[LoadBalancerName,State.Code]'
+```
 
 ### Step 4: Create IAM User for Student Lab Work
 
