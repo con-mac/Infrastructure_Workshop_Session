@@ -162,7 +162,7 @@ Resources:
   ApplicationLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub '/aws/ec2/${StudentEmail}-${Environment}'
+      LogGroupName: !Sub '/aws/ec2/${StudentName}-${Environment}'
       RetentionInDays: 7
       Tags:
         - Key: Name
