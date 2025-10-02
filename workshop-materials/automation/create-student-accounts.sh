@@ -80,7 +80,14 @@ create_account() {
         --role-name "$ROLE_NAME" \
         --output json)
     
-    local request_id=$(echo "$create_response" | jq -r '.CreateAccountStatus.Id')
+    local request_id=$(echo "$create_response" | jq -r '.CreateAccountStatus.Id // empty')
+    
+    if [ -z "$request_id" ] || [ "$request_id" = "null" ]; then
+        print_error "Failed to get request ID from account creation response"
+        print_error "Response: $create_response"
+        return 1
+    fi
+    
     print_status "Account creation initiated. Request ID: $request_id"
     
     # Wait for account creation to complete
