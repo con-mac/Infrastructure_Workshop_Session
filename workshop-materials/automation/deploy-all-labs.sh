@@ -54,11 +54,11 @@ check_account() {
     print_status "Current account ID: $account_id"
     
     if [ "$account_id" = "535002854646" ]; then
-        print_warning "You're in the master account. Please switch to a student account first."
-        exit 1
+        print_warning "You're in the master account. Deploying to master account..."
+        print_status "This will create lab infrastructure in the master account"
+    else
+        print_success "You're in a student account: $account_id"
     fi
-    
-    print_success "You're in a student account: $account_id"
 }
 
 # Function to deploy a CloudFormation stack
