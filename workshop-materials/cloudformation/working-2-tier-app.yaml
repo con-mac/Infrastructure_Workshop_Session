@@ -471,7 +471,7 @@ Resources:
   Database:
     Type: AWS::RDS::DBInstance
     Properties:
-      DBInstanceIdentifier: !Sub '${StudentEmail}-${Environment}-db'
+      DBInstanceIdentifier: !Sub '${Environment}-workshop-db'
       DBInstanceClass: !Ref DBInstanceClass
       Engine: mysql
       EngineVersion: '8.0'
@@ -487,7 +487,6 @@ Resources:
       BackupRetentionPeriod: 7
       PreferredBackupWindow: '03:00-04:00'
       PreferredMaintenanceWindow: 'sun:04:00-sun:05:00'
-      SkipFinalSnapshot: true
       DeletionProtection: false
       Tags:
         - Key: Name
