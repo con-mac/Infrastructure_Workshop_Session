@@ -14,13 +14,55 @@ This guide provides a step-by-step approach to create individual AWS accounts fo
 
 ## 🚀 Step-by-Step Implementation
 
-### Step 1: Manual Account Creation
+### Step 1: Account Creation (CLI Method - Recommended)
 
-**Objective:** Create individual AWS accounts for each student through the AWS Organizations console to bypass API limits.
+**Objective:** Create individual AWS accounts for each student using CLI commands for faster automation.
 
-#### 1.1 Access AWS Organizations Console
+#### 1.1 Prerequisites Check
 
-1. **Navigate to AWS Organizations**
+1. **Verify AWS CLI Configuration**
+   ```bash
+   aws sts get-caller-identity
+   ```
+   - Ensure you're in the master account (535002854646)
+   - Verify AWS CLI is configured with proper credentials
+
+2. **Check Current Account Status**
+   ```bash
+   aws organizations list-accounts --query 'Accounts[?Status==`ACTIVE`]'
+   ```
+   - Review current account count
+   - Note: AWS Organizations has daily limits (typically 5 accounts per day)
+
+#### 1.2 Automated Account Creation (CLI Method)
+
+**Use the provided script for fast account creation:**
+
+1. **Run the Account Creation Script**
+   ```bash
+   cd workshop-materials/automation
+   ./create-student-accounts.sh
+   ```
+
+2. **Script Configuration**
+   - Creates 10 student accounts
+   - Email format: `conor.macklin1986+student1@gmail.com`
+   - Account names: `Student1-Workshop-2025`, `Student2-Workshop-2025`, etc.
+   - Automatically moves accounts to Workshop-Students OU (`ou-01dw-2r1xz8cp`)
+
+3. **Script Features**
+   - ✅ Automated account creation
+   - ✅ Automatic OU assignment
+   - ✅ Progress tracking and status updates
+   - ✅ Error handling and retry logic
+   - ✅ Account ID tracking
+   - ✅ Summary report generation
+
+#### 1.3 Manual Account Creation (Fallback Method)
+
+**If CLI method fails due to limits, use manual console method:**
+
+1. **Access AWS Organizations Console**
    - Go to AWS Console → Services → AWS Organizations
    - Ensure you're in the master account (535002854646)
 
@@ -28,31 +70,15 @@ This guide provides a step-by-step approach to create individual AWS accounts fo
    - Confirm Workshop-Students OU exists
    - Note the OU ID: `ou-01dw-2r1xz8cp`
 
-#### 1.2 Create Individual Accounts
-
-**For each student (8 total), follow these steps:**
-
-1. **Click "Add account"**
-   - In AWS Organizations console
-   - Select "Create account"
-
-2. **Account Details**
+3. **Create Individual Accounts**
+   - Click "Add account" → "Create account"
    - **Account name:** `Student1-Workshop-2025` (replace 1 with student number)
-   - **Email address:** `student1+workshop@yourdomain.com` (use your domain)
+   - **Email address:** `conor.macklin1986+student1@gmail.com`
    - **IAM role name:** `OrganizationAccountAccessRole` (default)
-
-3. **Create Account**
-   - Click "Create account"
    - Wait for account creation (5-10 minutes)
-   - Note the account ID when created
+   - Move account to Workshop-Students OU
 
-4. **Move Account to Workshop-Students OU**
-   - Select the newly created account
-   - Click "Move account"
-   - Select "Workshop-Students" OU
-   - Confirm move
-
-**Repeat for all 8 students:**
+**Repeat for all 10 students:**
 - Student1-Workshop-2025
 - Student2-Workshop-2025
 - Student3-Workshop-2025
@@ -61,10 +87,17 @@ This guide provides a step-by-step approach to create individual AWS accounts fo
 - Student6-Workshop-2025
 - Student7-Workshop-2025
 - Student8-Workshop-2025
+- Student9-Workshop-2025
+- Student10-Workshop-2025
 
-#### 1.3 Document Account Information
+#### 1.4 Document Account Information
 
-Create a tracking document with:
+The CLI script automatically creates `account-ids.txt` with:
+- Account IDs for all created accounts
+- Creation status and timestamps
+- Summary report with account details
+
+**Manual tracking document should include:**
 - Account name
 - Account ID
 - Email address
