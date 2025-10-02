@@ -2,8 +2,8 @@
 ## From On-Premises to AWS
 
 **Target Audience:** First-year university students with little to no prior cloud experience  
-**Duration:** 90-100 minutes  
-**Focus Areas:** On-premises vs Cloud, Shared Responsibility, Networking, Compute, Automation, Monitoring  
+**Duration:** 95-105 minutes (16 slides)  
+**Focus Areas:** On-premises vs Cloud, Shared Responsibility, Networking, Compute, Containers, Storage, Automation, Monitoring  
 
 ---
 
@@ -250,37 +250,76 @@
 
 ---
 
-# **Slide 11: Containers and Storage**
+# **Slide 11: Containers**
 
-## **Containers (ECS/EKS)**
-• **Lightweight** - Share the host OS  
-• **Portable** - Run anywhere  
+## **What are Containers?**
+
+**Think of them as:** Lightweight, portable packages for applications
+
+### **Key Features:**
+• **Lightweight** - Share the host OS kernel  
+• **Portable** - Run anywhere (dev, test, prod)  
 • **Efficient** - Use fewer resources than VMs  
+• **Fast Startup** - Seconds vs minutes for VMs  
 
-## **Storage Options:**
+## **Container Images and Orchestration:**
 
-### **S3 (Simple Storage Service)**
-- Object storage for files, images, backups
-- Virtually unlimited capacity
+### **Container Images**
+- **What:** Pre-built packages containing your application + dependencies
+- **Like:** A recipe with all ingredients included
+- **Examples:** Docker images, AWS ECR images
 
-### **EBS (Elastic Block Store)**
-- Block storage for EC2 instances
-- Like a hard drive for your virtual machine
-
-### **EFS (Elastic File System)**
-- Shared file storage
-- Multiple instances can access the same files
+### **Container Orchestration (Kubernetes)**
+- **What:** Manages multiple containers across multiple servers
+- **Like:** A conductor managing an orchestra
+- **AWS Services:** EKS (Elastic Kubernetes Service)
+- **Benefits:** Auto-scaling, load balancing, health monitoring
 
 ---
 
 **Instructor Notes:**
-- Containers are like shipping containers - standardised and portable
+- Use shipping container analogy - standardised, portable, efficient
+- Explain container images like "frozen meals" - everything included
+- Kubernetes is like having a smart manager for your containers
+- Mention Docker as the most popular container platform
+- **Timing:** 6-7 minutes
+
+---
+
+# **Slide 12: Storage Services**
+
+## **AWS Storage Options:**
+
+### **S3 (Simple Storage Service)**
+- **What:** Object storage for files, images, backups
+- **Like:** A massive filing cabinet in the cloud
+- **Capacity:** Virtually unlimited
+- **Use Cases:** Website images, data backups, static content
+
+### **EBS (Elastic Block Store)**
+- **What:** Block storage for EC2 instances
+- **Like:** A hard drive for your virtual machine
+- **Features:** Persistent, high performance
+- **Use Cases:** Databases, file systems
+
+### **EFS (Elastic File System)**
+- **What:** Shared file storage
+- **Like:** A shared network drive
+- **Features:** Multiple instances can access same files
+- **Use Cases:** Shared documents, web content
+
+---
+
+**Instructor Notes:**
+- S3 is like Google Drive but for applications
+- EBS is like adding an external hard drive to your computer
+- EFS is like a shared folder everyone can access
 - Use examples: S3 for photos, EBS for databases, EFS for shared documents
 - **Timing:** 6-7 minutes
 
 ---
 
-# **Slide 12: Automation**
+# **Slide 13: Automation**
 
 ## **Serverless Computing (Lambda)**
 
@@ -310,7 +349,7 @@
 
 ---
 
-# **Slide 13: Monitoring and Observability**
+# **Slide 14: Monitoring and Observability**
 
 ## **CloudWatch**
 
@@ -337,7 +376,7 @@
 
 ---
 
-# **Slide 14: Key Takeaways**
+# **Slide 15: Key Takeaways**
 
 ## **What We've Learned:**
 
@@ -363,7 +402,7 @@ Ready for hands-on labs focusing on **Networking**, **RBAC**, and **Compute**!
 
 ---
 
-# **Slide 15: Lab Preview**
+# **Slide 16: Lab Preview**
 
 ## **What You'll Build Today:**
 
@@ -393,7 +432,7 @@ Ready for hands-on labs focusing on **Networking**, **RBAC**, and **Compute**!
 
 ---
 
-**Total Presentation Time: Approximately 90-100 minutes**
+**Total Presentation Time: Approximately 95-105 minutes**
 
 ## **Additional Instructor Resources:**
 
