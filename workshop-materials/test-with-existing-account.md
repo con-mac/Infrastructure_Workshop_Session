@@ -31,18 +31,22 @@ Since we've hit the AWS Organizations account creation limit (5 per day), let's 
 
 ### Step 2: Switch to Test Account
 
-1. **Switch to the test account**
-   ```bash
-   # Use AWS Organizations console to switch role
-   # Or use AWS CLI with assume role
-   ```
+1. **Switch to the test account using AWS Organizations Console**
+   - Go to AWS Organizations console
+   - Find your test account
+   - Click "Switch role" or "Access account"
+   - Use OrganizationAccountAccessRole
 
 2. **Verify account access**
    ```bash
    aws sts get-caller-identity
    ```
+   - You should now be in the test account (not master account)
+   - Note the Account ID for later use
 
-### Step 3: Deploy Lab Infrastructure
+### Step 3: Deploy Lab Infrastructure (As Root User)
+
+**You're now in the test account as root user (via OrganizationAccountAccessRole)**
 
 1. **Deploy CloudFormation Stack**
    ```bash
@@ -71,7 +75,17 @@ Since we've hit the AWS Organizations account creation limit (5 per day), let's 
    aws elbv2 describe-load-balancers --query 'LoadBalancers[*].[LoadBalancerName,State.Code]'
    ```
 
-### Step 4: Create IAM User for Direct Console Access
+4. **Get Application URL**
+   ```bash
+   # Get Load Balancer DNS name
+   aws elbv2 describe-load-balancers \
+     --query 'LoadBalancers[0].DNSName' \
+     --output text
+   ```
+
+### Step 4: Create IAM User for Student Lab Work
+
+**Still in the test account as root user - creating IAM user for student**
 
 1. **Create IAM User**
    ```bash
@@ -93,7 +107,14 @@ Since we've hit the AWS Organizations account creation limit (5 per day), let's 
      --policy-arn "arn:aws:iam::aws:policy/PowerUserAccess"
    ```
 
+4. **Verify IAM User Creation**
+   ```bash
+   aws iam get-user --user-name "student1"
+   ```
+
 ### Step 5: Generate Direct Console Link
+
+**Still in the test account as root user - generating access info for student**
 
 1. **Get Account ID**
    ```bash
@@ -109,10 +130,21 @@ Since we've hit the AWS Organizations account creation limit (5 per day), let's 
    echo "Password: Workshop2025!"
    ```
 
-### Step 6: Test Student Workflow
+3. **Document Access Information**
+   ```bash
+   echo "=== STUDENT ACCESS INFORMATION ===" > student-access.txt
+   echo "Console URL: $CONSOLE_URL" >> student-access.txt
+   echo "Username: student1" >> student-access.txt
+   echo "Password: Workshop2025!" >> student-access.txt
+   echo "Account ID: $ACCOUNT_ID" >> student-access.txt
+   ```
+
+### Step 6: Test Student Workflow (As IAM User)
+
+**Now switch to the IAM user to test the student experience**
 
 1. **Test Console Login**
-   - Open the console URL
+   - Open the console URL: `https://ACCOUNT_ID.signin.aws.amazon.com/console`
    - Login with student1 credentials
    - Verify no MFA required
    - Test basic navigation
@@ -121,11 +153,18 @@ Since we've hit the AWS Organizations account creation limit (5 per day), let's 
    - Verify 2-tier app is deployed
    - Test application access
    - Check resource availability
+   - Verify you can see all lab resources
 
 3. **Test Lab Workflow**
    - Complete a sample lab challenge
    - Verify all required resources are available
    - Test any lab-specific functionality
+   - Verify you can modify resources as needed
+
+4. **Verify Security**
+   - Confirm you're logged in as student1 (not root)
+   - Check that you have appropriate permissions
+   - Verify you can't access root-level functions
 
 ### Step 7: Update Dashboard for Monitoring
 
@@ -195,10 +234,12 @@ Since we've hit the AWS Organizations account creation limit (5 per day), let's 
 
 ## 📝 Notes
 
-- This approach gives you a working system today
-- You can test everything before creating all accounts
-- Tomorrow you can create the remaining accounts
-- Same process will be used for all student accounts
+- **Root user** deploys lab infrastructure (full permissions for setup)
+- **IAM user** completes lab challenges (restricted permissions for security)
+- **Better security** - root user not used for lab work
+- **AWS best practices** - separation of setup vs. lab work
+- **Working system today** - no waiting for account limits
+- **Tomorrow** - create remaining accounts with same process
 
 ---
 
