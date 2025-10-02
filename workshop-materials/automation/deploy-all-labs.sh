@@ -7,7 +7,7 @@ set -e  # Exit on any error
 
 # Configuration
 STACK_PREFIX="Student1"
-CLOUDFORMATION_DIR="workshop-materials/cloudformation"
+CLOUDFORMATION_DIR="cloudformation"
 
 # Colors for output
 RED='\033[0;31m'
