@@ -286,7 +286,7 @@ Resources:
   LaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
     Properties:
-      LaunchTemplateName: !Sub '${StudentEmail}-${Environment}-lt'
+      LaunchTemplateName: !Sub '${StudentName}-${Environment}-lt'
       LaunchTemplateData:
         ImageId: ami-0c02fb55956c7d316  # Amazon Linux 2 AMI
         InstanceType: !Ref InstanceType
@@ -435,7 +435,7 @@ Resources:
   AutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
-      AutoScalingGroupName: !Sub '${StudentEmail}-${Environment}-asg'
+      AutoScalingGroupName: !Sub '${StudentName}-${Environment}-asg'
       VPCZoneIdentifier:
         - !Ref PublicSubnet
         - !Ref PublicSubnet2
@@ -461,7 +461,7 @@ Resources:
   DatabaseSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
     Properties:
-      DBSubnetGroupName: !Sub '${StudentEmail}-${Environment}-db-subnet-group'
+      DBSubnetGroupName: !Sub '${StudentName}-${Environment}-db-subnet-group'
       DBSubnetGroupDescription: Subnet group for workshop database
       SubnetIds:
         - !Ref PublicSubnet
@@ -503,7 +503,7 @@ Resources:
   CloudWatchDashboard:
     Type: AWS::CloudWatch::Dashboard
     Properties:
-      DashboardName: !Sub '${StudentEmail}-${Environment}-dashboard'
+      DashboardName: !Sub '${StudentName}-${Environment}-dashboard'
       DashboardBody: !Sub |
         {
           "widgets": [
