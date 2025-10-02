@@ -77,11 +77,16 @@ deploy_stack() {
     # Check if stack already exists
     if aws cloudformation describe-stacks --stack-name "$stack_name" &> /dev/null; then
         print_warning "Stack $stack_name already exists. Updating..."
-        aws cloudformation update-stack \
+        local update_result=$(aws cloudformation update-stack \
             --stack-name "$stack_name" \
             --template-body "file://$template_file" \
             --capabilities $capabilities \
-            --output json > /dev/null
+            --output json 2>&1)
+        
+        if echo "$update_result" | grep -q "No updates are to be performed"; then
+            print_success "Stack $stack_name is already up to date!"
+            return 0
+        fi
     else
         print_status "Creating new stack: $stack_name"
         aws cloudformation create-stack \
