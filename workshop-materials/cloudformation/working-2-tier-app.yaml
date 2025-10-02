@@ -427,7 +427,7 @@ Resources:
       DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref TargetGroup
-      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      LoadBalancerArn: !Ref LoadBalancer
       Port: 80
       Protocol: HTTP
 
@@ -515,8 +515,8 @@ Resources:
               "height": 6,
               "properties": {
                 "metrics": [
-                  ["AWS/ApplicationELB", "TargetResponseTime", "LoadBalancer", "${ApplicationLoadBalancer}"],
-                  ["AWS/ApplicationELB", "RequestCount", "LoadBalancer", "${ApplicationLoadBalancer}"]
+                  ["AWS/ApplicationELB", "TargetResponseTime", "LoadBalancer", "${LoadBalancer}"],
+                  ["AWS/ApplicationELB", "RequestCount", "LoadBalancer", "${LoadBalancer}"]
                 ],
                 "period": 300,
                 "stat": "Average",
@@ -547,13 +547,13 @@ Resources:
 Outputs:
   ApplicationURL:
     Description: URL to access the application
-    Value: !Sub 'http://${ApplicationLoadBalancer.DNSName}'
+    Value: !Sub 'http://${LoadBalancer.DNSName}'
     Export:
       Name: !Sub '${AWS::StackName}-ApplicationURL'
 
   LoadBalancerDNS:
     Description: DNS name of the load balancer
-    Value: !GetAtt ApplicationLoadBalancer.DNSName
+    Value: !GetAtt LoadBalancer.DNSName
     Export:
       Name: !Sub '${AWS::StackName}-LoadBalancerDNS'
 
