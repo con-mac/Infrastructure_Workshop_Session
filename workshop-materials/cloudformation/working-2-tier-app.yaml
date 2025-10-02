@@ -7,6 +7,11 @@ Parameters:
     Description: Student email address for resource tagging
     Default: 'student@university.edu'
   
+  StudentName:
+    Type: String
+    Description: Sanitized student name for resource naming
+    Default: 'student1'
+  
   Environment:
     Type: String
     Description: Environment name (dev, staging, prod)
@@ -377,10 +382,10 @@ Resources:
                 Value: 'Infrastructure-2024'
 
   # Application Load Balancer
-  ApplicationLoadBalancer:
+  LoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
-      Name: !Sub '${StudentEmail}-${Environment}-alb'
+      Name: !Sub '${StudentName}-${Environment}-alb'
       Scheme: internet-facing
       Type: application
       SecurityGroups:
@@ -398,7 +403,7 @@ Resources:
   TargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      Name: !Sub '${StudentEmail}-${Environment}-tg'
+      Name: !Sub '${StudentName}-${Environment}-tg'
       Port: 80
       Protocol: HTTP
       VpcId: !Ref WorkshopVPC
